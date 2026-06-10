@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>WebRTC 音声通話テスト</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <h2>🎙 WebRTCで音声通話テスト画面</h2>
+
+    <p>ステータス： <span id="status">接続を待ってます…</span></p>
+
+    <button id="startButton" onclick="startCall()" disabled>通話を開始（発信）</button>
+
+    <div id="video-area">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <audio id="remoteAudio" autoplay></audio>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
