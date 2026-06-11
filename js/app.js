@@ -1,7 +1,7 @@
 // ===============================
 // 1. グローバル変数
 // ===============================
-const ws = new WebSocket("ws://127.0.0.1:8000/ws/signal");
+const ws = new WebSocket("wss://webrtc-test-zgzq.onrender.com/ws");
 let peerConnection = null;
 let localStream = null;
 
