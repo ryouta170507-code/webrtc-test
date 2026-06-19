@@ -31,16 +31,18 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/token")
 def get_token(identity: str):
-    # 💡 厄介な VideoGrant クラスを使わず、直接辞書（dict）で権限を指定します
+    # 1. 権限をオブジェクトではなく、ただの辞書(dict)として作ります
     grants = {
         "room_join": True,
         "room": ROOM_NAME
     }
     
+    # 2. AccessToken を組み立て、作成した辞書をそのまま渡します
     token = (
         AccessToken(API_KEY, API_SECRET)
         .with_identity(identity)
-        .with_grants(grants)  # 💡 ここに辞書をそのまま渡します
+        .with_grants(grants)  # 👈 ここに上の grants を渡すのがポイントです
     )
     
-    return {"token": token.to_jwt().decode('utf-8')}
+    # 3. トークンを文字列にして返します
+    return {"token": token.to_jwt()}
