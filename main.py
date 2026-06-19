@@ -1,8 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-# 💡 VideoGrant を新しくインポートに追加しました
 from livekit.api import AccessToken
-# VideoGrantは別の場所からインポートします
-from livekit.protocol.models import VideoGrant
 
 app = FastAPI()
 
@@ -34,10 +31,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/token")
 def get_token(identity: str):
+    # 💡 厄介な VideoGrant クラスを使わず、直接辞書（dict）で権限を指定します
+    grants = {
+        "room_join": True,
+        "room": ROOM_NAME
+    }
+    
     token = (
         AccessToken(API_KEY, API_SECRET)
         .with_identity(identity)
-        .with_grants(VideoGrant(room_join=True, room=ROOM_NAME))
+        .with_grants(grants)  # 💡 ここに辞書をそのまま渡します
     )
-    # 💡 最後に .decode('utf-8') を付け足します
+    
     return {"token": token.to_jwt().decode('utf-8')}
