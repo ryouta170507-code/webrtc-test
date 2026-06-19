@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from livekit.api import AccessToken
+# 💡 VideoGrant を新しくインポートに追加しました
+from livekit.api import AccessToken, VideoGrant
 
 app = FastAPI()
 
@@ -31,7 +32,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/token")
 def get_token(identity: str):
-    token = AccessToken(API_KEY, API_SECRET)
-    token.identity = identity
-    token.add_grant(room_join=True, room=ROOM_NAME)
+    # 💡 エラーの原因だったメソッドを、新しい書き方に修正しました
+    token = (
+        AccessToken(API_KEY, API_SECRET)
+        .with_identity(identity)
+        .with_grants(VideoGrant(room_join=True, room=ROOM_NAME))
+    )
     return {"token": token.to_jwt()}
