@@ -1,6 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from livekit_api import AccessToken
-
+from livekit.api import AccessToken
 
 app = FastAPI()
 
