@@ -32,10 +32,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/token")
 def get_token(identity: str):
-    # 💡 エラーの原因だったメソッドを、新しい書き方に修正しました
     token = (
         AccessToken(API_KEY, API_SECRET)
         .with_identity(identity)
         .with_grants(VideoGrant(room_join=True, room=ROOM_NAME))
     )
-    return {"token": token.to_jwt()}
+    # 💡 最後に .decode('utf-8') を付け足します
+    return {"token": token.to_jwt().decode('utf-8')}
