@@ -1,6 +1,8 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 # 💡 VideoGrant を新しくインポートに追加しました
-from livekit.api import AccessToken, VideoGrant
+from livekit.api import AccessToken
+# VideoGrantは別の場所からインポートします
+from livekit.protocol.models import VideoGrant
 
 app = FastAPI()
 
