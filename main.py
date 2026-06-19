@@ -45,4 +45,4 @@ def get_token(identity: str):
     )
     
     # 3. トークンを文字列にして返します
-    return {"token": token.to_jwt()}
+    return {"token": token.to_jwt().decode('utf-8')}
