@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles  # 👈 これを追加！
-from livekit.api import AccessToken
+from fastapi.staticfiles import StaticFiles  
+from livekit_api import AccessToken, VideoGrant
 
 app = FastAPI()
 
@@ -9,11 +9,7 @@ API_KEY = "API5JKYXvyDCxvN"
 API_SECRET = "7XcGx9xagBJK0fgbjT1Z1kxTAkrulZZf24pCvYnYOSa"
 ROOM_NAME = "team-room"
 
-connected_clients: list[WebSocket] = []
-
-app = FastAPI()
-
-# 👇 この2行を追加！ブラウザに css/ や js/ フォルダを見せるための設定です
+# 静的ファイル
 app.mount("/css", StaticFiles(directory="css"), name="css")
 app.mount("/js", StaticFiles(directory="js"), name="js")
 
@@ -21,8 +17,7 @@ app.mount("/js", StaticFiles(directory="js"), name="js")
 def read_index():
     return FileResponse("index.html")
 
-API_KEY = "API5JKYXvyDCxvN"
-# ...（以下はそのまま）
+connected_clients: list[WebSocket] = []
 
 @app.websocket("/ws/signal")
 async def websocket_endpoint(websocket: WebSocket):
@@ -46,18 +41,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/token")
 def get_token(identity: str):
-    # 1. 権限をオブジェクトではなく、ただの辞書(dict)として作ります
-    grants = {
-        "room_join": True,
-        "room": ROOM_NAME
-    }
-    
-    # 2. AccessToken を組み立て、作成した辞書をそのまま渡します
-    token = (
-        AccessToken(API_KEY, API_SECRET)
-        .with_identity(identity)
-        .with_grants(grants)  # 👈 ここに上の grants を渡すのがポイントです
-    )
-    
-    # 3. トークンを文字列にして返します
-    return {"token": token.to_jwt().decode('utf-8')}
+    grant = VideoGrant(room_join=True, room=ROOM_NAME)
+
+    token = AccessToken(API_KEY, API_SECRET)
+    token.identity = identity
+    token.add_grant(grant)
+
+    return {"token": token.to_jwt()}
