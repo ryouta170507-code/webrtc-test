@@ -64,6 +64,48 @@ def debug3():
     root_files = sorted([f for f in os.listdir('.') if f.lower().startswith('livekit')])
     return {"python": sys.version, "site_packages_livekit_samples": sample, "import_results": import_results, "project_root_livekit_files": root_files}
 
+# 一時追加: /debug4
+import importlib.util, os, sys
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/debug4")
+def debug4():
+    spec = importlib.util.find_spec("livekit")
+    if spec is None:
+        return {"error": "livekit spec not found"}
+    locations = None
+    try:
+        locations = list(spec.submodule_search_locations) if spec.submodule_search_locations else None
+    except Exception as e:
+        locations = f"error getting submodule_search_locations: {e}"
+
+    samples = {}
+    if locations:
+        for loc in locations:
+            try:
+                samples[loc] = sorted(os.listdir(loc))
+            except Exception as e:
+                samples[loc] = f"error listing: {e}"
+    else:
+        samples["note"] = "no submodule_search_locations (namespace or single-file package)"
+
+    # さらに、試しに common candidate imports and attributes
+    import_results = {}
+    for candidate in ("livekit", "livekit.access", "livekit.tokens", "livekit.api", "livekit.auth"):
+        try:
+            m = __import__(candidate, fromlist=["*"])
+            import_results[candidate] = {
+                "imported": True,
+                "file": getattr(m, "__file__", None),
+                "attrs_sample": sorted([a for a in dir(m) if not a.startswith("_")])[:200]
+            }
+        except Exception as e:
+            import_results[candidate] = {"imported": False, "error": str(e)}
+
+    return {"python": sys.version, "spec": {"name": spec.name, "origin": getattr(spec, "origin", None)}, "locations": locations, "samples": samples, "import_results": import_results}
+
 
 API_KEY = "REDACTED"
 API_SECRET = "REDACTED"
