@@ -108,8 +108,8 @@ def debug4():
     return {"python": sys.version, "spec": {"name": spec.name, "origin": getattr(spec, "origin", None)}, "locations": locations, "samples": samples, "import_results": import_results}
 
 
-API_KEY = "REDACTED"
-API_SECRET = "REDACTED"
+API_KEY = "APISBA8ZqwtvMy5"
+API_SECRET = "ThsA0eBIX1277b3KSbH3xGyEgtfkZkxyzdJmV3QjeeVC"
 ROOM_NAME = "team-room"
 
 app.mount("/css", StaticFiles(directory="css"), name="css")
