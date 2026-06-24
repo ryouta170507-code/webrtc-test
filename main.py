@@ -76,14 +76,49 @@ app.mount("/js", StaticFiles(directory="js"), name="js")
 def read_index():
     return FileResponse("index.html")
 
+# main.py の /token 部分をこれに置き換えてください（既存の app 定義と衝突しないように）
 @app.get("/token")
 def get_token(identity: str):
-    try:
-        from livekit_api import AccessToken, VideoGrant
-    except Exception as e:
-        return {"error": "cannot import livekit_api", "detail": str(e)}
+    # 試しにいくつかの候補パスで import を試す
+    import importlib
+    candidates = [
+        ("livekit_api", ["AccessToken", "VideoGrant"]),
+        ("livekit", ["AccessToken", "VideoGrant"]),
+        ("livekit.tokens", ["AccessToken", "VideoGrant"]),
+        ("livekit.access", ["AccessToken", "VideoGrant"]),
+    ]
+    imported = None
+    last_err = None
+    for mod_name, attrs in candidates:
+        try:
+            mod = importlib.import_module(mod_name)
+            # check attributes
+            if all(hasattr(mod, a) for a in attrs):
+                AccessToken = getattr(mod, "AccessToken")
+                VideoGrant = getattr(mod, "VideoGrant")
+                imported = (mod_name, "direct")
+                break
+            # sometimes AccessToken is in a submodule
+            for sub in ["tokens", "auth", "access", "api"]:
+                try:
+                    submod = importlib.import_module(f"{mod_name}.{sub}")
+                    if all(hasattr(submod, a) for a in attrs):
+                        AccessToken = getattr(submod, "AccessToken")
+                        VideoGrant = getattr(submod, "VideoGrant")
+                        imported = (f"{mod_name}.{sub}", "sub")
+                        break
+                except Exception:
+                    pass
+            if imported:
+                break
+        except Exception as e:
+            last_err = str(e)
+    if not imported:
+        return {"error": "cannot import AccessToken/VideoGrant", "detail": last_err or "not found in candidates"}
+
+    # ここまで来れば AccessToken と VideoGrant が使える
     grant = VideoGrant(room_join=True, room=ROOM_NAME)
     token = AccessToken(API_KEY, API_SECRET)
     token.identity = identity
     token.add_grant(grant)
-    return {"token": token.to_jwt()}
+    return {"token": token.to_jwt(), "imported_from": imported}
