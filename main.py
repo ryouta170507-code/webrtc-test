@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse  # 👈 これを追加！
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles  # 👈 これを追加！
 from livekit.api import AccessToken
 
 app = FastAPI()
@@ -12,11 +13,13 @@ connected_clients: list[WebSocket] = []
 
 app = FastAPI()
 
-# 👇 ここから3行を追加！
+# 👇 この2行を追加！ブラウザに css/ や js/ フォルダを見せるための設定です
+app.mount("/css", StaticFiles(directory="css"), name="css")
+app.mount("/js", StaticFiles(directory="js"), name="js")
+
 @app.get("/")
 def read_index():
     return FileResponse("index.html")
-# 👆 ここまでを追加！
 
 API_KEY = "API5JKYXvyDCxvN"
 # ...（以下はそのまま）
