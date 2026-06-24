@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from livekit import AccessToken, VideoGrant
+from livekit_api import AccessToken, VideoGrant
 
 app = FastAPI()
 
