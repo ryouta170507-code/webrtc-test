@@ -1,5 +1,7 @@
 import { connect } from "livekit-client";
 
+const LIVEKIT_URL = "wss://YOUR-LIVEKIT-URL.livekit.cloud";
+
 async function start() {
   const token = await fetch(`/token?identity=user-${Math.random()}`)
     .then(res => res.json())
