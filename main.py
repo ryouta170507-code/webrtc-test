@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse  # 👈 これを追加！
 from livekit.api import AccessToken
 
 app = FastAPI()
@@ -8,6 +9,17 @@ API_SECRET = "7XcGx9xagBJK0fgbjT1Z1kxTAkrulZZf24pCvYnYOSa"
 ROOM_NAME = "team-room"
 
 connected_clients: list[WebSocket] = []
+
+app = FastAPI()
+
+# 👇 ここから3行を追加！
+@app.get("/")
+def read_index():
+    return FileResponse("index.html")
+# 👆 ここまでを追加！
+
+API_KEY = "API5JKYXvyDCxvN"
+# ...（以下はそのまま）
 
 @app.websocket("/ws/signal")
 async def websocket_endpoint(websocket: WebSocket):
