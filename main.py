@@ -30,6 +30,41 @@ def debug2():
     root_files = sorted([f for f in os.listdir('.') if f.lower().startswith('livekit')])
     return {"python": sys.version, "site_packages_samples": sample, "project_root_livekit_files": root_files}
 
+# main.py に一時追加する /debug3
+import sys, os, importlib, importlib.util
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/debug3")
+def debug3():
+    sp = [p for p in sys.path if 'site-packages' in p]
+    sample = {}
+    for p in sp[:3]:
+        try:
+            names = sorted(os.listdir(p))
+            # livekit に関するファイル/フォルダだけ抽出
+            livekit_related = [n for n in names if n.lower().startswith('livekit')]
+            sample[p] = {"count": len(names), "livekit_related": livekit_related[:200]}
+        except Exception as e:
+            sample[p] = {"error": str(e)}
+    # 試しに import してみる
+    import_results = {}
+    for mod in ("livekit_api", "livekit"):
+        try:
+            m = importlib.import_module(mod)
+            import_results[mod] = {
+                "imported": True,
+                "module_file": getattr(m, "__file__", None),
+                "attrs_sample": sorted([a for a in dir(m) if not a.startswith("_")])[:80]
+            }
+        except Exception as e:
+            import_results[mod] = {"imported": False, "error": str(e)}
+    # プロジェクトルートに livekit* があるか
+    root_files = sorted([f for f in os.listdir('.') if f.lower().startswith('livekit')])
+    return {"python": sys.version, "site_packages_livekit_samples": sample, "import_results": import_results, "project_root_livekit_files": root_files}
+
+
 API_KEY = "REDACTED"
 API_SECRET = "REDACTED"
 ROOM_NAME = "team-room"
