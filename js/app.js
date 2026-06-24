@@ -14,10 +14,10 @@ async function start() {
   await room.localParticipant.setMicrophoneEnabled(true);
 
   // 他の参加者の映像を受信
-  room.on("trackSubscribed", (track, publication, participant) => {
-    const el = track.attach();
-    document.body.appendChild(el);
-  });
+room.on("trackSubscribed", (track, publication, participant) => {
+  const el = track.attach();
+  document.getElementById("videos").appendChild(el);
+});
 
   // 離脱したときの処理
   room.on("trackUnsubscribed", (track) => {
