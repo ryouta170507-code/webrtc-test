@@ -51,3 +51,26 @@ def get_token(identity: str):
     token.identity = identity
     token.add_grant(grant)
     return {"token": token.to_jwt()}
+
+@app.get("/debug_livekit")
+def debug_livekit():
+    import importlib, json
+    out = {}
+    try:
+        mod = importlib.import_module("livekit.api")
+        out["module"] = "livekit.api"
+    except Exception as e1:
+        try:
+            mod = importlib.import_module("livekit")
+            out["module"] = "livekit"
+        except Exception as e2:
+            return {"error": "cannot import livekit", "detail": str(e1) + " | " + str(e2)}
+    out["attrs"] = sorted([name for name in dir(mod) if not name.startswith("_")])
+    # もし AccessToken が別モジュールにあるかも知れないので top-level も確認
+    try:
+        import livekit
+        out["livekit_attrs"] = sorted([n for n in dir(livekit) if not n.startswith("_")])
+    except Exception:
+        out["livekit_attrs"] = []
+    return out
+
