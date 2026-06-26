@@ -32,10 +32,11 @@ def resolve_livekit_classes():
 def get_token(identity: str):
     if not API_KEY or not API_SECRET:
         return {"error": "LIVEKIT_API_KEY または LIVEKIT_API_SECRET が設定されていません"}
-    try:
-        AccessToken, GrantClass = resolve_livekit_classes()
-    except Exception as e:
-        return {"error": "cannot import AccessToken/Grant", "detail": str(e)}
+       try:
+            api_mod = importlib.import_module("livekit.api")
+        except Exception:
+    api_mod = importlib.import_module("livekit")
+
     grant = GrantClass(room_join=True, room=ROOM_NAME)
     token = AccessToken(API_KEY, API_SECRET)
     token.identity = identity
