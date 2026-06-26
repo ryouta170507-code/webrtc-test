@@ -17,25 +17,54 @@ def read_index():
     return FileResponse("index.html")
 
 def resolve_livekit_classes():
-    try:
-        api_mod = importlib.import_module("livekit.api")
-    except Exception:
-        api_mod = importlib.import_module("livekit")
+    import importlib
 
-    AccessToken = getattr(api_mod, "AccessToken", None)
-    if AccessToken is None:
-        raise ImportError("AccessToken が livekit.api に見つかりません")
+    # 試すモジュール名の順序
+    module_candidates = [
+        "livekit.api",
+        "livekit.access",
+        "livekit",
+    ]
 
-    GrantClass = None
-    for name in dir(api_mod):
-        if name.lower().endswith("grant"):
-            GrantClass = getattr(api_mod, name)
-            break
+    # Grant の候補名（大文字小文字をそのまま試す）
+    grant_candidates = [
+        "VideoGrant", "VideoGrants", "RoomJoinGrant", "JoinGrant", "Grant"
+    ]
 
-    if GrantClass is None:
-        raise ImportError("Grant クラスが livekit.api に見つかりません")
+    for mod_name in module_candidates:
+        try:
+            api_mod = importlib.import_module(mod_name)
+        except Exception:
+            continue
 
-    return AccessToken, GrantClass
+        # AccessToken を探す（モジュール直下、または access サブモジュール）
+        AccessToken = getattr(api_mod, "AccessToken", None)
+        if AccessToken is None:
+            try:
+                access_mod = importlib.import_module("livekit.access")
+                AccessToken = getattr(access_mod, "AccessToken", None)
+            except Exception:
+                AccessToken = None
+
+        # Grant 系を自動検出（*grant で終わるものを優先）
+        GrantClass = None
+        for name in dir(api_mod):
+            if name.lower().endswith("grant"):
+                GrantClass = getattr(api_mod, name)
+                break
+
+        # 候補リストで明示的に探す
+        if GrantClass is None:
+            for cand in grant_candidates:
+                if hasattr(api_mod, cand):
+                    GrantClass = getattr(api_mod, cand)
+                    break
+
+        if AccessToken and GrantClass:
+            return AccessToken, GrantClass
+
+    # 見つからなければ明確なエラーを投げる
+    raise ImportError("AccessToken/Grant が見つかりません")
 
 @app.get("/token")
 def get_token(identity: str):
