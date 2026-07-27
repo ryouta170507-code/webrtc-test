@@ -1,6 +1,4 @@
-// js/app.js の先頭をこれに
-import { connect } from "https://esm.sh/livekit-client";
-
+import { Room } from "https://esm.sh/livekit-client";
 
 const LIVEKIT_URL = "wss://webrtc-wtj5ox8r.livekit.cloud";
 
@@ -17,8 +15,9 @@ async function start() {
       .then(res => res.json())
       .then(data => data.token);
 
-    // 2. ルームへの接続
-    const room = await connect(LIVEKIT_URL, token);
+    // 2. Roomインスタンスを作成し、ルームへ接続
+    const room = new Room({ adaptiveStream: true, dynacast: true });
+    await room.connect(LIVEKIT_URL, token);
     console.log("ルームに接続しました:", room.name);
 
     // 3. 自分のカメラとマイクを有効化
