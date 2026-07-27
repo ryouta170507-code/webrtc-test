@@ -20,9 +20,18 @@ async function start() {
     await room.connect(LIVEKIT_URL, token);
     console.log("ルームに接続しました:", room.name);
 
-    // 3. 自分のカメラとマイクを有効化
-    await room.localParticipant.setCameraEnabled(true);
-    await room.localParticipant.setMicrophoneEnabled(true);
+   // 3. 自分のカメラとマイクを有効化（エラーが起きても無視して進むように修正）
+    try {
+      await room.localParticipant.setCameraEnabled(true);
+    } catch (e) {
+      console.warn("カメラの有効化に失敗しました（スキップします）:", e);
+    }
+
+    try {
+      await room.localParticipant.setMicrophoneEnabled(true);
+    } catch (e) {
+      console.warn("マイクの有効化に失敗しました（スキップします）:", e);
+    }
 
     // 4. 自分の映像を画面に表示
     room.localParticipant.videoTrackPublications.forEach((publication) => {
