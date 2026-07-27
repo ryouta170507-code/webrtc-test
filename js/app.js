@@ -17,13 +17,18 @@ function createParticipantCard(participant) {
   const avatar = document.createElement("div");
   avatar.className = "avatar-placeholder";
   
-  const nameStr = participant.identity ? String(participant.identity) : "U";
-  avatar.textContent = nameStr.substring(0, 2).toUpperCase();
+  // システム内部用の「#数字」をカットして、純粋な名前だけを画面上に表示する
+  const rawName = participant.identity || "Unknown";
+  const displayName = rawName.split("#")[0]; 
+  
+  // 安全に名前の最初の2文字を切り出す
+  avatar.textContent = displayName.substring(0, 2).toUpperCase();
   card.appendChild(avatar);
 
+  // 名前ラベル
   const label = document.createElement("div");
   label.className = "name-label";
-  label.textContent = participant.identity || "Unknown";
+  label.textContent = displayName;
   card.appendChild(label);
 
   container.appendChild(card);
@@ -57,8 +62,10 @@ function handleTrackDetach(track) {
 
 async function start() {
   const nameInput = document.getElementById("username-input");
-  // 名前が未入力の場合はランダムな名前を生成
-  const identity = nameInput.value.trim() || `user-${Math.floor(Math.random() * 10000)}`;
+  const baseName = nameInput.value.trim() || "User";
+
+  // ★【最重要】同じ名前でも統合されないよう、裏側で「#ランダムな4桁の数字」を付与する
+  const uniqueIdentity = `${baseName}#${Math.floor(1000 + Math.random() * 9000)}`;
 
   const connectBtn = document.getElementById("connect-btn");
   if (connectBtn) {
@@ -67,8 +74,8 @@ async function start() {
   }
 
   try {
-    // 1. 入力された名前(identity)を渡してトークンを取得
-    const token = await fetch(`/token?identity=${encodeURIComponent(identity)}`)
+    // 1. 生成した一意の名前(uniqueIdentity)を渡してトークンを取得
+    const token = await fetch(`/token?identity=${encodeURIComponent(uniqueIdentity)}`)
       .then(res => res.json())
       .then(data => data.token);
 
@@ -144,7 +151,7 @@ document.getElementById("toggle-cam-btn")?.addEventListener("click", async (e) =
   e.target.classList.toggle("active", enabled);
 
   // 自分のカメラ要素の表示・非表示を即座に連動
-  room.localParticipant.videoTrackPublications.forEach((publication) => {
+  currentRoom.localParticipant.videoTrackPublications.forEach((publication) => {
     if (!enabled && publication.videoTrack) {
       handleTrackAttach(publication.videoTrack, currentRoom.localParticipant);
     } else if (enabled && publication.videoTrack) {
@@ -169,3 +176,4 @@ document.getElementById("leave-btn")?.addEventListener("click", () => {
     connectBtn.textContent = "通話に参加";
   }
 });
+
