@@ -2,14 +2,52 @@ import { Room, RoomEvent } from "https://esm.sh";
 
 const LIVEKIT_URL = "wss://webrtc-wtj5ox8r.livekit.cloud";
 
-// 画面にカメラや音声のトラックを追加する共通関数
-function handleTrackAttach(track) {
-  // すでに同じトラックが画面に追加されていないかチェック（重複防止）
-  if (document.getElementById(track.sid)) return;
+// 1. 参加者が入室したときに「カードの枠」だけを先に作る関数
+function createParticipantCard(participant) {
+  if (document.getElementById(`card-${participant.sid}`)) return;
+
+  const container = document.getElementById("videos");
+
+  // カード全体の枠
+  const card = document.createElement("div");
+  card.className = "participant-card";
+  card.id = `card-${participant.sid}`;
+
+  // アバター（カメラがないときのダミー）
+  const avatar = document.createElement("div");
+  avatar.className = "avatar-placeholder";
+  // ユーザー名の最初の1文字をアイコンにする
+  avatar.textContent = (participant.identity || "U").substring(0, 2).toUpperCase();
+  card.appendChild(avatar);
+
+  // 名前ラベル
+  const label = document.createElement("div");
+  label.className = "name-label";
+  label.textContent = participant.identity;
+  card.appendChild(label);
+
+  container.appendChild(card);
+}
+
+// 2. 参加者が退室したときにカードを消去する関数
+function removeParticipantCard(participant) {
+  const card = document.getElementById(`card-${participant.sid}`);
+  if (card) card.remove();
+}
+
+// 3. 映像や音声（トラック）が届いたときに、該当する参加者のカード内に追加する関数
+function handleTrackAttach(track, participant) {
+  const card = document.getElementById(`card-${participant.sid}`);
+  if (!card) return;
+
+  // すでに同じ映像要素が追加されている場合はスキップ
+  if (document.getElementById(`track-${track.sid}`)) return;
 
   const el = track.attach();
-  el.id = track.sid; // トラックのIDを要素に付与して管理
-  document.getElementById("videos").appendChild(el);
+  el.id = `track-${track.sid}`;
+  
+  // 音声トラックは見えないのでそのまま追加、ビデオならアバターの上に重ねる
+  card.appendChild(el);
 }
 
 async function start() {
@@ -20,27 +58,30 @@ async function start() {
   }
 
   try {
-    // 1. トークンの取得
+    // トークンの取得
     const token = await fetch(`/token?identity=user-${Math.floor(Math.random() * 10000)}`)
       .then(res => res.json())
       .then(data => data.token);
 
-    // 2. Roomインスタンスを作成
+    // Roomインスタンス作成
     const room = new Room({ adaptiveStream: true, dynacast: true });
     
-    // 3. 【新入室後に配信が始まった場合】の受信イベント（後から配信が開始された時用）
-    room.on(RoomEvent.TrackSubscribed, (track) => {
-      handleTrackAttach(track);
+    // 他の人が入室してきたら枠を作る
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      createParticipantCard(participant);
     });
 
-    // 4. 他の人が離脱、またはカメラをオフにしたときの処理
-    room.on(RoomEvent.TrackUnsubscribed, (track) => {
-      const el = document.getElementById(track.sid);
-      if (el) el.remove();
-      track.detach().forEach(e => e.remove());
+    // 他の人が退室したら枠を消す
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      removeParticipantCard(participant);
     });
 
-    // 5. ルームへの接続を実行
+    // 映像・音声が流れてきたら、その人のカードに紐付ける
+    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      handleTrackAttach(track, participant);
+    });
+
+    // ルームへの接続
     await room.connect(LIVEKIT_URL, token);
     console.log("ルームに接続しました:", room.name);
 
@@ -48,35 +89,36 @@ async function start() {
       connectBtn.textContent = "通話中";
     }
 
-    // ★6. 【最重要：すでに部屋にいる人たち】の映像と音声を一斉に取得して表示する
+    // 自分のカードを画面に作成
+    createParticipantCard(room.localParticipant);
+
+    // すでに部屋にいる他の人たちのカードを全員分作成して、映像があれば流す
     room.remoteParticipants.forEach((participant) => {
+      createParticipantCard(participant);
       participant.trackPublications.forEach((publication) => {
-        // すでに配信中のトラックがあれば画面（またはスピーカー）に追加
         if (publication.track) {
-          handleTrackAttach(publication.track);
+          handleTrackAttach(publication.track, participant);
         }
       });
     });
 
-    // 7. 自分のカメラを有効化（デバイスがない場合はスキップ）
+    // 自分のカメラを有効化（デバイスがない場合はスキップ）
     try {
       await room.localParticipant.setCameraEnabled(true);
-      
-      // カメラがある場合のみ、自分の映像を画面に表示
       room.localParticipant.videoTrackPublications.forEach((publication) => {
         if (publication.videoTrack) {
-          handleTrackAttach(publication.videoTrack);
+          handleTrackAttach(publication.videoTrack, room.localParticipant);
         }
       });
     } catch (cameraErr) {
-      console.warn("このデバイスにはカメラがないか、許可されていません:", cameraErr);
+      console.warn("カメラがありません:", cameraErr);
     }
 
-    // 8. 自分のマイクを有効化（デバイスがない場合はスキップ）
+    // 自分のマイクを有効化（デバイスがない場合はスキップ）
     try {
       await room.localParticipant.setMicrophoneEnabled(true);
     } catch (micErr) {
-      console.warn("このデバイスにはマイクがないか、許可されていません:", micErr);
+      console.warn("マイクがありません:", micErr);
     }
 
   } catch (err) {
@@ -89,7 +131,6 @@ async function start() {
   }
 }
 
-// 「通話に参加」ボタンのクリックイベントに紐付ける
 const connectBtn = document.getElementById("connect-btn");
 if (connectBtn) {
   connectBtn.addEventListener("click", start);
