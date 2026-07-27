@@ -1,4 +1,4 @@
-import { connect } from "livekit-client";
+import { connect } from "https://esm.sh/livekit-client";
 
 const LIVEKIT_URL = "wss://wss://webrtc-wtj5ox8r.livekit.cloud";
 
