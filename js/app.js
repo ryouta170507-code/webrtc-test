@@ -1,4 +1,6 @@
-import * as Livekit from 'https://jsdelivr.net';
+// js/app.js の先頭をこれに
+import { connect } from "https://esm.sh/livekit-client";
+
 
 const LIVEKIT_URL = "wss://webrtc-wtj5ox8r.livekit.cloud";
 
