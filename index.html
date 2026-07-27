@@ -5,30 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LiveKit WebRTC 通話</title>
     <link rel="stylesheet" href="css/style.css">
-    <style>
-        /* 追加機能用のCSSを一時的に補足（必要に応じて style.css に移してください） */
-        .name-edit-box {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
-        .name-edit-box input {
-            padding: 10px;
-            font-size: 0.9rem;
-            border: 2px solid #cbd5e0;
-            border-radius: 8px;
-            outline: none;
-            width: 140px;
-        }
-        .name-edit-box input:focus {
-            border-color: #0066cc;
-        }
-        #update-name-btn {
-            background-color: #4a5568;
-            padding: 10px 14px;
-            font-size: 0.9rem;
-        }
-    </style>
 </head>
 <body>
     <h2>LiveKit Room</h2>
@@ -39,12 +15,8 @@
         <button id="connect-btn" class="btn">通話に参加</button>
     </div>
 
-    <!-- 通話中の操作ボタンエリア（名前変更欄を追加） -->
+    <!-- 通話中の操作ボタンエリア（名前変更欄を削除） -->
     <div id="controls">
-        <div class="name-edit-box">
-            <input type="text" id="new-username-input" placeholder="新しい名前">
-            <button id="update-name-btn" class="btn">名前変更</button>
-        </div>
         <button id="toggle-mic-btn" class="btn control-btn">マイクをミュート</button>
         <button id="toggle-cam-btn" class="btn control-btn">カメラをオフ</button>
         <button id="leave-btn" class="btn">退室する</button>
