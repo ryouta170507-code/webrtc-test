@@ -3,38 +3,7 @@ import { Room, RoomEvent } from "https://esm.sh/livekit-client";
 const LIVEKIT_URL = "wss://webrtc-wtj5ox8r.livekit.cloud";
 let currentRoom = null;
 
-// 参加者の表示名を取得する共通関数
-function getParticipantDisplayName(participant) {
-  // 1. もし通話中に変更された名前（attributes）があればそれを最優先する
-  if (participant.attributes && participant.attributes.displayName) {
-    return participant.attributes.displayName;
-  }
-  // 2. なければ、入室時のidentityから「#数字」をカットした名前を使う
-  const rawName = participant.identity || "Unknown";
-  return rawName.split("#")[0]; // ★ここを修正しました
-}
-
-// 参加者のカード枠にある名前ラベルとアバターを更新する関数
-function updateParticipantLabels(participant) {
-  const card = document.getElementById(`card-${participant.sid}`);
-  if (!card) return;
-
-  const displayName = getParticipantDisplayName(participant);
-
-  // アバターの文字を更新（安全に最初の2文字を切り出す）
-  const avatar = card.querySelector(".avatar-placeholder");
-  if (avatar) {
-    avatar.textContent = String(displayName).substring(0, 2).toUpperCase();
-  }
-
-  // 名前ラベルの文字を更新
-  const label = card.querySelector(".name-label");
-  if (label) {
-    label.textContent = displayName;
-  }
-}
-
-// 参加者が入室したときに枠を作る関数
+// 参加者が入室したときに「カードの枠」を作る関数
 function createParticipantCard(participant) {
   if (!participant || document.getElementById(`card-${participant.sid}`)) return;
 
@@ -47,16 +16,22 @@ function createParticipantCard(participant) {
 
   const avatar = document.createElement("div");
   avatar.className = "avatar-placeholder";
+  
+  // 入室時のidentityから「#数字」をカットした純粋な名前を取り出す
+  const rawName = participant.identity || "Unknown";
+  const displayName = rawName.split("#")[0];
+  
+  // 名前の最初の2文字をアバターにする
+  avatar.textContent = String(displayName).substring(0, 2).toUpperCase();
   card.appendChild(avatar);
 
+  // 名前ラベル
   const label = document.createElement("div");
   label.className = "name-label";
+  label.textContent = displayName;
   card.appendChild(label);
 
   container.appendChild(card);
-
-  // 初回の名前セット
-  updateParticipantLabels(participant);
 }
 
 // 参加者が退室したときにカードを消去する関数
@@ -112,25 +87,16 @@ async function start() {
     room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => handleTrackAttach(track, participant));
     room.on(RoomEvent.TrackUnsubscribed, (track) => handleTrackDetach(track));
 
-    // 誰かが名前を変えた（属性が変更された）ら画面の表示を更新する
-    room.on(RoomEvent.ParticipantAttributesChanged, (changedAttributes, participant) => {
-      if (participant) {
-        updateParticipantLabels(participant);
-      }
-    });
-
     await room.connect(LIVEKIT_URL, token);
     console.log("ルームに接続しました:", room.name);
 
     document.getElementById("setup-area").style.display = "none";
     document.getElementById("controls").style.display = "flex";
 
-    // 通話中名前入力欄の初期値をセット
-    const newNameInput = document.getElementById("new-username-input");
-    if (newNameInput) newNameInput.value = baseName;
-
+    // 自分のカードを作成
     createParticipantCard(room.localParticipant);
 
+    // すでに部屋にいる他の人たちのカードと映像を再現
     room.remoteParticipants.forEach((participant) => {
       createParticipantCard(participant);
       participant.trackPublications.forEach((publication) => {
@@ -138,6 +104,7 @@ async function start() {
       });
     });
 
+    // 自分のカメラ・マイクの初期有効化（デバイスがなければスキップ）
     try {
       await room.localParticipant.setCameraEnabled(true);
       room.localParticipant.videoTrackPublications.forEach((publication) => {
@@ -160,23 +127,6 @@ async function start() {
 }
 
 document.getElementById("connect-btn")?.addEventListener("click", start);
-
-// 名前変更ボタンのクリック処理
-document.getElementById("update-name-btn")?.addEventListener("click", async () => {
-  if (!currentRoom) return;
-  const newNameInput = document.getElementById("new-username-input");
-  const newName = newNameInput.value.trim();
-  if (!newName) return alert("名前を入力してください");
-
-  try {
-    // 自分の属性（attributes）に新しい名前をセットして全員に同期する
-    await currentRoom.localParticipant.setAttributes({ displayName: newName });
-    // 自分自身の画面のラベルも更新
-    updateParticipantLabels(currentRoom.localParticipant);
-  } catch (err) {
-    console.error("名前の変更に失敗しました:", err);
-  }
-});
 
 // マイクのオンオフ
 document.getElementById("toggle-mic-btn")?.addEventListener("click", async (e) => {
