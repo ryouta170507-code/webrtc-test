@@ -1,12 +1,13 @@
-import { Room, RoomEvent } from "https://esm.sh";
+import { Room, RoomEvent } from "https://esm.sh/livekit-client";
 
 const LIVEKIT_URL = "wss://webrtc-wtj5ox8r.livekit.cloud";
 
 // 1. 参加者が入室したときに「カードの枠」だけを先に作る関数
 function createParticipantCard(participant) {
-  if (document.getElementById(`card-${participant.sid}`)) return;
+  if (!participant || document.getElementById(`card-${participant.sid}`)) return;
 
   const container = document.getElementById("videos");
+  if (!container) return;
 
   // カード全体の枠
   const card = document.createElement("div");
@@ -16,14 +17,16 @@ function createParticipantCard(participant) {
   // アバター（カメラがないときのダミー）
   const avatar = document.createElement("div");
   avatar.className = "avatar-placeholder";
-  // ユーザー名の最初の1文字をアイコンにする
-  avatar.textContent = (participant.identity || "U").substring(0, 2).toUpperCase();
+  
+  // 安全に名前の最初の2文字を切り出す
+  const nameStr = participant.identity ? String(participant.identity) : "U";
+  avatar.textContent = nameStr.substring(0, 2).toUpperCase();
   card.appendChild(avatar);
 
   // 名前ラベル
   const label = document.createElement("div");
   label.className = "name-label";
-  label.textContent = participant.identity;
+  label.textContent = participant.identity || "Unknown";
   card.appendChild(label);
 
   container.appendChild(card);
@@ -31,12 +34,15 @@ function createParticipantCard(participant) {
 
 // 2. 参加者が退室したときにカードを消去する関数
 function removeParticipantCard(participant) {
+  if (!participant) return;
   const card = document.getElementById(`card-${participant.sid}`);
   if (card) card.remove();
 }
 
 // 3. 映像や音声（トラック）が届いたときに、該当する参加者のカード内に追加する関数
 function handleTrackAttach(track, participant) {
+  if (!track || !participant) return;
+  
   const card = document.getElementById(`card-${participant.sid}`);
   if (!card) return;
 
@@ -131,6 +137,7 @@ async function start() {
   }
 }
 
+// 「通話に参加」ボタンのクリックイベントに紐付ける
 const connectBtn = document.getElementById("connect-btn");
 if (connectBtn) {
   connectBtn.addEventListener("click", start);
