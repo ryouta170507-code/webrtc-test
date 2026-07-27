@@ -11,7 +11,7 @@ function getParticipantDisplayName(participant) {
   }
   // 2. なければ、入室時のidentityから「#数字」をカットした名前を使う
   const rawName = participant.identity || "Unknown";
-  return rawName.split("#")[0];
+  return rawName.split("#")[0]; // ★ここを修正しました
 }
 
 // 参加者のカード枠にある名前ラベルとアバターを更新する関数
@@ -21,10 +21,10 @@ function updateParticipantLabels(participant) {
 
   const displayName = getParticipantDisplayName(participant);
 
-  // アバターの文字を更新
+  // アバターの文字を更新（安全に最初の2文字を切り出す）
   const avatar = card.querySelector(".avatar-placeholder");
   if (avatar) {
-    avatar.textContent = displayName.substring(0, 2).toUpperCase();
+    avatar.textContent = String(displayName).substring(0, 2).toUpperCase();
   }
 
   // 名前ラベルの文字を更新
@@ -112,7 +112,7 @@ async function start() {
     room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => handleTrackAttach(track, participant));
     room.on(RoomEvent.TrackUnsubscribed, (track) => handleTrackDetach(track));
 
-    // ★【最重要】誰かが名前を変えた（属性が変更された）ら画面の表示を更新する
+    // 誰かが名前を変えた（属性が変更された）ら画面の表示を更新する
     room.on(RoomEvent.ParticipantAttributesChanged, (changedAttributes, participant) => {
       if (participant) {
         updateParticipantLabels(participant);
@@ -161,7 +161,7 @@ async function start() {
 
 document.getElementById("connect-btn")?.addEventListener("click", start);
 
-// ★名前変更ボタンのクリック処理
+// 名前変更ボタンのクリック処理
 document.getElementById("update-name-btn")?.addEventListener("click", async () => {
   if (!currentRoom) return;
   const newNameInput = document.getElementById("new-username-input");
@@ -169,7 +169,7 @@ document.getElementById("update-name-btn")?.addEventListener("click", async () =
   if (!newName) return alert("名前を入力してください");
 
   try {
-    // 自分の属性（attributes）に新しい名前をセットして全員に同期する [1]
+    // 自分の属性（attributes）に新しい名前をセットして全員に同期する
     await currentRoom.localParticipant.setAttributes({ displayName: newName });
     // 自分自身の画面のラベルも更新
     updateParticipantLabels(currentRoom.localParticipant);
