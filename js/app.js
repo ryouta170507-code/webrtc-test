@@ -151,8 +151,12 @@ async function start() {
       try {
         const str = new TextDecoder().decode(payload);
         const data = JSON.parse(str);
-        if (data.type === "transcript" && participant) {
-          displayCaption(participant.sid, data.text);
+        if (data.type === "transcript") {
+          // 画面下部の字幕エリアを更新
+          const captionText = document.getElementById("caption-text");
+          if (captionText) {
+            captionText.textContent = data.text;
+          }
         }
       } catch (e) {
         console.error("データ受信エラー:", e);
