@@ -62,7 +62,7 @@ h2 {
 
 /* 通話中のコントロールパネル */
 #controls {
-    display: none; /* 初期状態は非表示 */
+    display: none;
     gap: 10px;
     margin-bottom: 20px;
     flex-wrap: wrap;
@@ -70,18 +70,26 @@ h2 {
 }
 .control-btn {
     background-color: #4a5568;
+    color: white;
     padding: 10px 18px;
     font-size: 0.9rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.control-btn:hover {
+    opacity: 0.9;
 }
 .control-btn.active {
     background-color: #e53e3e; /* ミュート・オフの時は赤くする */
 }
 
-/* 【追加】字幕ボタンがON（アクティブ）の時の色 */
+/* 字幕 ON 時のスタイルを追加 */
 #toggle-stt-btn.active {
-    background-color: #2b6cb0; /* 字幕ONの時は青色にハイライト */
+    background-color: #2b6cb0;
 }
 
+/* 退室ボタンのスタイルを修正 */
 #leave-btn {
     background-color: #e53e3e;
 }
@@ -102,7 +110,6 @@ h2 {
     aspect-ratio: 4 / 3;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -146,28 +153,22 @@ h2 {
     z-index: 2;
 }
 
-/* 【追加】リアルタイム字幕表示エリア */
+/* 【修正】文字起こし表示エリア */
 .caption-box {
     position: absolute;
-    bottom: 42px; /* 名前ラベルの上に表示される位置に調整 */
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(0, 0, 0, 0.6);
     color: #ffffff;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    line-height: 1.4;
-    max-width: 85%;
-    text-align: center;
-    word-break: break-word;
-    z-index: 3; /* 映像や名前ラベルより手前に表示 */
-    display: none;
-    pointer-events: none;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    padding: 12px;
+    font-size: 1rem;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-/* 字幕があるときだけ表示 */
-.caption-box.active {
-    display: block;
+#caption-text {
+    margin-bottom: 8px;
 }
