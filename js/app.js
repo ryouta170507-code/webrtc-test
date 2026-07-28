@@ -290,6 +290,11 @@ document.getElementById("ai-summary-btn")?.addEventListener("click", () => {
     return;
   }
 
+  // スマホ表示中の場合、自動で「AIまとめ」タブに切り替える
+  if (window.innerWidth <= 768 && tabSummaryBtn) {
+    tabSummaryBtn.click();
+  }
+
   summaryBox.innerHTML = "<p><i>AIが会話要約を生成中...</i></p>";
 
   setTimeout(() => {
@@ -356,3 +361,27 @@ document.getElementById("leave-btn")?.addEventListener("click", () => {
     connectBtn.textContent = "通話に参加";
   }
 });
+
+/* ==========================================
+   スマホ用 タブ切り替え処理
+   ========================================== */
+const tabTranscriptBtn = document.getElementById("tab-transcript-btn");
+const tabSummaryBtn = document.getElementById("tab-summary-btn");
+const transcriptPanel = document.getElementById("transcript-panel");
+const summaryPanel = document.getElementById("summary-panel");
+
+if (tabTranscriptBtn && tabSummaryBtn && transcriptPanel && summaryPanel) {
+  tabTranscriptBtn.addEventListener("click", () => {
+    tabTranscriptBtn.classList.add("active");
+    tabSummaryBtn.classList.remove("active");
+    transcriptPanel.classList.add("active-tab");
+    summaryPanel.classList.remove("active-tab");
+  });
+
+  tabSummaryBtn.addEventListener("click", () => {
+    tabSummaryBtn.classList.add("active");
+    tabTranscriptBtn.classList.remove("active");
+    summaryPanel.classList.add("active-tab");
+    transcriptPanel.classList.remove("active-tab");
+  });
+}
