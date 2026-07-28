@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LiveKit WebRTC 通話</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -20,10 +20,16 @@
         <!-- 1. 上部：参加者のビデオ/アバター枠（横並び） -->
         <div id="videos" class="videos-row"></div>
 
-        <!-- 2. 中央：文字起こし ＆ AIまとめ（左右2分割） -->
+        <!-- スマホ専用：表示切り替えタブ（PCでは自動で非表示になります） -->
+        <div class="mobile-tab-bar">
+            <button id="tab-transcript-btn" class="mobile-tab-btn active">文字起こし</button>
+            <button id="tab-summary-btn" class="mobile-tab-btn">AIまとめ（要約）</button>
+        </div>
+
+        <!-- 2. 中央：文字起こし ＆ AIまとめ -->
         <div id="middle-content">
             <!-- 左：文字起こしエリア -->
-            <div class="panel-box" id="transcript-panel">
+            <div class="panel-box active-tab" id="transcript-panel">
                 <div class="panel-header">文字起こし</div>
                 <div id="transcript-list" class="panel-body"></div>
             </div>
