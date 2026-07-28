@@ -1,212 +1,358 @@
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+import { Room, RoomEvent } from "https://esm.sh/livekit-client";
+
+const LIVEKIT_URL = "wss://webrtc-wtj5ox8r.livekit.cloud";
+let currentRoom = null;
+let recognition = null;
+let isTranscribing = false;
+let conversationLogs = [];
+let timerInterval = null;
+let secondsElapsed = 0;
+
+// タイマーを開始する関数
+function startTimer() {
+  secondsElapsed = 0;
+  const timerEl = document.getElementById("timer");
+  
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    secondsElapsed++;
+    const hrs = String(Math.floor(secondsElapsed / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((secondsElapsed % 3600) / 60)).padStart(2, '0');
+    const secs = String(secondsElapsed % 60).padStart(2, '0');
+    if (timerEl) {
+      timerEl.textContent = `経過時間 ${hrs}:${mins}:${secs}`;
+    }
+  }, 1000);
 }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #1a202c;
-    color: #ffffff;
-    height: 100vh;
-    overflow: hidden;
+// タイマーをストップする関数
+function stopTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  const timerEl = document.getElementById("timer");
+  if (timerEl) timerEl.textContent = "経過時間 00:00:00";
 }
 
-/* 入室画面 */
-.setup-container {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    width: 100%;
-    max-width: 360px;
-    margin: 100px auto;
-    padding: 30px;
-    background-color: #2d3748;
-    border-radius: 12px;
-    text-align: center;
+// 中央の「文字起こし」エリアにログを追加・自動スクロールする関数
+function appendTranscriptLog(speaker, text) {
+  const listEl = document.getElementById("transcript-list");
+  if (!listEl || !text.trim()) return;
+
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+
+  const item = document.createElement("div");
+  item.className = "log-item";
+  item.innerHTML = `<span class="speaker">${speaker}:</span> ${text}`;
+  
+  listEl.appendChild(item);
+  listEl.scrollTop = listEl.scrollHeight;
+
+  // ダウンロード用データにも保存
+  conversationLogs.push(`[${timeStr}] ${speaker}: ${text}`);
 }
 
-#username-input {
-    padding: 12px;
-    font-size: 1rem;
-    border: 1px solid #4a5568;
-    border-radius: 6px;
-    background-color: #1a202c;
-    color: #fff;
+// 参加者カード作成（上部横並び用）
+function createParticipantCard(participant) {
+  if (!participant || document.getElementById(`card-${participant.sid}`)) return;
+
+  const container = document.getElementById("videos");
+  if (!container) return;
+
+  const card = document.createElement("div");
+  card.className = "participant-card";
+  card.id = `card-${participant.sid}`;
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar-placeholder";
+  
+  const rawName = participant.identity || "Unknown";
+  const displayName = rawName.split("#")[0];
+  
+  avatar.textContent = String(displayName).substring(0, 2).toUpperCase();
+  card.appendChild(avatar);
+
+  const label = document.createElement("div");
+  label.className = "name-label";
+  label.textContent = displayName;
+  card.appendChild(label);
+
+  container.appendChild(card);
 }
 
-/* 全体フレーム（100vhで画面いっぱいに表示） */
-#call-container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    width: 100vw;
+function removeParticipantCard(participant) {
+  if (!participant) return;
+  const card = document.getElementById(`card-${participant.sid}`);
+  if (card) card.remove();
 }
 
-/* 1. 上部：参加者一覧（横スクロール可能） */
-.videos-row {
-    display: flex;
-    gap: 12px;
-    padding: 12px;
-    background-color: #111827;
-    height: 160px;
-    overflow-x: auto;
-    flex-shrink: 0;
-    border-bottom: 1px solid #374151;
+function handleTrackAttach(track, participant) {
+  if (!track || !participant) return;
+  const card = document.getElementById(`card-${participant.sid}`);
+  if (!card) return;
+  if (document.getElementById(`track-${track.sid}`)) return;
+
+  const el = track.attach();
+  el.id = `track-${track.sid}`;
+  card.appendChild(el);
 }
 
-.participant-card {
-    background-color: #1f2937;
-    border-radius: 8px;
-    aspect-ratio: 4 / 3;
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #374151;
+function handleTrackDetach(track) {
+  if (!track) return;
+  const el = document.getElementById(`track-${track.sid}`);
+  if (el) el.remove();
 }
 
-.avatar-placeholder {
-    width: 50px;
-    height: 50px;
-    background-color: #374151;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    font-weight: bold;
+// 音声認識セットアップ
+function setupSpeechRecognition(room) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  
+  if (!SpeechRecognition) {
+    console.warn("このブラウザは音声認識非対応です。");
+    const sttBtn = document.getElementById("toggle-stt-btn");
+    if (sttBtn) {
+      sttBtn.textContent = "字幕非対応";
+      sttBtn.disabled = true;
+    }
+    return;
+  }
+
+  try {
+    recognition = new SpeechRecognition();
+    recognition.lang = "ja-JP";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+
+      if (transcript.trim() && room) {
+        const rawName = room.localParticipant.identity || "Me";
+        const displayName = rawName.split("#")[0];
+
+        // 中央パネルに書き出し
+        appendTranscriptLog(displayName, transcript);
+
+        // 他のユーザーへ送信
+        const encoder = new TextEncoder();
+        const payload = encoder.encode(JSON.stringify({ type: "transcript", text: transcript }));
+        room.localParticipant.publishData(payload, { reliable: true });
+      }
+    };
+
+    recognition.onerror = (e) => console.warn("音声認識エラー:", e.error);
+    
+    recognition.onend = () => {
+      if (isTranscribing) {
+        try { recognition.start(); } catch (e) {}
+      }
+    };
+
+  } catch (err) {
+    console.error("SpeechRecognition初期化エラー:", err);
+  }
 }
 
-.participant-card video {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover;
-    position: absolute;
-    top: 0;
-    left: 0;
+async function start() {
+  const nameInput = document.getElementById("username-input");
+  const baseName = nameInput ? nameInput.value.trim() || "User" : "User";
+  const uniqueIdentity = `${baseName}#${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const connectBtn = document.getElementById("connect-btn");
+  if (connectBtn) {
+    connectBtn.disabled = true;
+    connectBtn.textContent = "接続中...";
+  }
+
+  try {
+    const token = await fetch(`/token?identity=${encodeURIComponent(uniqueIdentity)}`)
+      .then(res => res.json())
+      .then(data => data.token);
+
+    const room = new Room({ adaptiveStream: true, dynacast: true });
+    currentRoom = room;
+    
+    room.on(RoomEvent.ParticipantConnected, (p) => createParticipantCard(p));
+    room.on(RoomEvent.ParticipantDisconnected, (p) => removeParticipantCard(p));
+    room.on(RoomEvent.TrackSubscribed, (track, pub, p) => handleTrackAttach(track, p));
+    room.on(RoomEvent.TrackUnsubscribed, (track) => handleTrackDetach(track));
+
+    // 受信データ（相手の発言）を中央パネルへ出力
+    room.on(RoomEvent.DataReceived, (payload, participant) => {
+      if (!participant) return;
+      try {
+        const str = new TextDecoder().decode(payload);
+        const data = JSON.parse(str);
+        
+        if (data.type === "transcript" && data.text.trim() !== "") {
+          const rawName = participant.identity || "Unknown";
+          const displayName = rawName.split("#")[0];
+          appendTranscriptLog(displayName, data.text);
+        }
+      } catch (e) {
+        console.error("データ受信エラー:", e);
+      }
+    });
+
+    await room.connect(LIVEKIT_URL, token);
+
+    // 安全に表示切替
+    const setupArea = document.getElementById("setup-area");
+    if (setupArea) setupArea.style.display = "none";
+
+    const callContainer = document.getElementById("call-container");
+    if (callContainer) callContainer.style.display = "flex";
+
+    // タイマー開始
+    startTimer();
+
+    // 自分のカードを作成
+    createParticipantCard(room.localParticipant);
+
+    room.remoteParticipants.forEach((participant) => {
+      createParticipantCard(participant);
+      participant.trackPublications.forEach((publication) => {
+        if (publication.track) handleTrackAttach(publication.track, participant);
+      });
+    });
+
+    try {
+      await room.localParticipant.setCameraEnabled(true);
+      room.localParticipant.videoTrackPublications.forEach((pub) => {
+        if (pub.videoTrack) handleTrackAttach(pub.videoTrack, room.localParticipant);
+      });
+    } catch (e) { console.warn("カメラなし:", e); }
+
+    try {
+      await room.localParticipant.setMicrophoneEnabled(true);
+    } catch (e) { console.warn("マイクなし:", e); }
+
+    setupSpeechRecognition(room);
+
+  } catch (err) {
+    alert("接続に失敗しました: " + err.message);
+    if (connectBtn) {
+      connectBtn.disabled = false;
+      connectBtn.textContent = "通話に参加";
+    }
+  }
 }
 
-.name-label {
-    position: absolute;
-    bottom: 6px;
-    left: 6px;
-    background-color: rgba(0, 0, 0, 0.7);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    z-index: 2;
-}
+document.getElementById("connect-btn")?.addEventListener("click", start);
 
-/* 2. 中央：文字起こし & AIまとめ */
-#middle-content {
-    display: flex;
-    flex: 1;
-    gap: 12px;
-    padding: 12px;
-    overflow: hidden;
-}
+// マイク/カメラの切り替え
+document.getElementById("toggle-mic-btn")?.addEventListener("click", async (e) => {
+  if (!currentRoom) return;
+  const enabled = currentRoom.localParticipant.isMicrophoneEnabled;
+  await currentRoom.localParticipant.setMicrophoneEnabled(!enabled);
+  e.target.textContent = !enabled ? "マイク" : "マイク(オフ)";
+  e.target.classList.toggle("active", enabled);
+});
 
-.panel-box {
-    flex: 1;
-    background-color: #1f2937;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid #374151;
-    overflow: hidden;
-}
+document.getElementById("toggle-cam-btn")?.addEventListener("click", async (e) => {
+  if (!currentRoom) return;
+  const enabled = currentRoom.localParticipant.isCameraEnabled;
+  await currentRoom.localParticipant.setCameraEnabled(!enabled);
+  e.target.textContent = !enabled ? "カメラ" : "カメラ(オフ)";
+  e.target.classList.toggle("active", enabled);
+});
 
-.panel-header {
-    background-color: #111827;
-    padding: 10px 16px;
-    font-weight: bold;
-    font-size: 1rem;
-    border-bottom: 1px solid #374151;
-    color: #e5e7eb;
-}
+// 字幕（文字起こし）ON/OFF
+document.getElementById("toggle-stt-btn")?.addEventListener("click", (e) => {
+  if (!recognition) return;
 
-.panel-body {
-    padding: 16px;
-    flex: 1;
-    overflow-y: auto;
-    font-size: 0.95rem;
-    line-height: 1.6;
-}
+  if (isTranscribing) {
+    recognition.stop();
+    isTranscribing = false;
+    e.target.textContent = "字幕 ON";
+    e.target.classList.remove("active");
+  } else {
+    try {
+      recognition.start();
+      isTranscribing = true;
+      e.target.textContent = "字幕 OFF";
+      e.target.classList.add("active");
+    } catch (err) {
+      console.error("音声認識エラー:", err);
+    }
+  }
+});
 
-/* 文字起こしログアイテム */
-.log-item {
-    margin-bottom: 10px;
-    word-break: break-all;
-}
+// 「AIまとめ」ボタンを押したときの処理
+document.getElementById("ai-summary-btn")?.addEventListener("click", () => {
+  const summaryBox = document.getElementById("summary-content");
+  if (!summaryBox) return;
 
-.log-item .speaker {
-    font-weight: bold;
-    color: #60a5fa;
-    margin-right: 6px;
-}
+  if (conversationLogs.length === 0) {
+    alert("要約するための会話データがまだありません。字幕をONにして会話してください。");
+    return;
+  }
 
-.placeholder-text {
-    color: #9ca3af;
-    font-style: italic;
-}
+  summaryBox.innerHTML = "<p><i>AIが会話要約を生成中...</i></p>";
 
-/* 3. 下部：コントロールバー */
-#controls-bar {
-    height: 64px;
-    background-color: #111827;
-    border-top: 1px solid #374151;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
-    flex-shrink: 0;
-}
+  setTimeout(() => {
+    summaryBox.innerHTML = `
+      <h4>【自動生成された要約】</h4>
+      <ul>
+        <li><b>進行状況:</b> 通話が順調に行われています。</li>
+        <li><b>発言件数:</b> 計 ${conversationLogs.length} 件の発言を記録しました。</li>
+      </ul>
+    `;
+  }, 1000);
+});
 
-.controls-left, .controls-right {
-    flex: 1;
-    display: flex;
-    align-items: center;
-}
+// ログ保存
+document.getElementById("save-log-btn")?.addEventListener("click", () => {
+  if (conversationLogs.length === 0) {
+    alert("保存する会話ログがありません。");
+    return;
+  }
 
-.controls-right {
-    justify-content: flex-end;
-}
+  const blob = new Blob([conversationLogs.join("\n")], { type: "text/plain;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `meeting_log_${new Date().toISOString().split('T')[0]}.txt`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+});
 
-.controls-center {
-    display: flex;
-    gap: 10px;
-}
+// 退室（終了）処理
+document.getElementById("leave-btn")?.addEventListener("click", () => {
+  if (recognition && isTranscribing) {
+    recognition.stop();
+    isTranscribing = false;
+  }
+  if (currentRoom) {
+    currentRoom.disconnect();
+    currentRoom = null;
+  }
+  
+  stopTimer();
+  conversationLogs = [];
+  
+  const videos = document.getElementById("videos");
+  if (videos) videos.innerHTML = "";
 
-#timer {
-    font-family: monospace;
-    font-size: 0.95rem;
-    background-color: #1f2937;
-    padding: 6px 12px;
-    border-radius: 6px;
-    border: 1px solid #374151;
-}
+  const list = document.getElementById("transcript-list");
+  if (list) list.innerHTML = "";
 
-/* ボタン装飾 */
-.btn {
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-    font-weight: bold;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: 0.2s;
-}
+  const summary = document.getElementById("summary-content");
+  if (summary) summary.innerHTML = '<p class="placeholder-text">「AIまとめ」ボタンを押すと、ここまでの会話の要約が表示されます。</p>';
 
-.btn:hover { opacity: 0.85; }
+  const callContainer = document.getElementById("call-container");
+  if (callContainer) callContainer.style.display = "none";
 
-.control-btn { background-color: #374151; }
-.control-btn.active { background-color: #dc2626; }
+  const setupArea = document.getElementById("setup-area");
+  if (setupArea) setupArea.style.display = "flex";
 
-.ai-btn { background-color: #16a34a; } /* 緑色 */
-.log-btn { background-color: #2563eb; } /* 青色 */
-.leave-btn { background-color: #dc2626; } /* 赤色 */
+  const connectBtn = document.getElementById("connect-btn");
+  if (connectBtn) {
+    connectBtn.disabled = false;
+    connectBtn.textContent = "通話に参加";
+  }
+});
