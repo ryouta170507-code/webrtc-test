@@ -16,11 +16,14 @@
     </div>
 
     <!-- 通話中の操作ボタンエリア（名前変更欄を削除） -->
-    <div id="controls">
-        <button id="toggle-mic-btn" class="btn control-btn">マイクをミュート</button>
-        <button id="toggle-cam-btn" class="btn control-btn">カメラをオフ</button>
-        <button id="toggle-stt-btn">字幕 ON</button>
-        <button id="leave-btn" class="btn">退室する</button>
+    <div id="controls" style="display: none;">
+      <button id="toggle-mic-btn" class="control-btn">マイクをミュート</button>
+      <button id="toggle-cam-btn" class="control-btn">カメラをオフ</button>
+  
+      <!-- ↓ このボタンのデザインを統一しました -->
+      <button id="toggle-stt-btn" class="control-btn">字幕 ON</button>
+  
+      <button id="leave-btn" class="control-btn">退室する</button>
     </div>
 
     <div id="videos"></div>
