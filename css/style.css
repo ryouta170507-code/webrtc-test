@@ -35,7 +35,16 @@ body {
     background-color: #1a202c;
     color: #fff;
 }
+/* ★ 追加: 通話に参加ボタンの背景色とスタイル */
+#connect-btn {
+    background-color: #2563eb;
+    padding: 12px;
+    font-size: 1rem;
+}
 
+#connect-btn:hover {
+    background-color: #1d4ed8;
+}
 /* 全体フレーム */
 #call-container {
     display: flex;
