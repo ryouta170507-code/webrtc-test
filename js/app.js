@@ -102,7 +102,7 @@ function handleTrackDetach(track) {
   if (el) el.remove();
 }
 
-// 音声認識セットアップ
+// 音声認識セットアップ（話し終わり確定時のみログ化するよう修正）
 function setupSpeechRecognition(room) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   
@@ -120,25 +120,27 @@ function setupSpeechRecognition(room) {
     recognition = new SpeechRecognition();
     recognition.lang = "ja-JP";
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = true; // 認識精度向上のため有効化
 
     recognition.onresult = (event) => {
-      let transcript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
+        // ★ 確定した（話し終わった）テキストのみを処理
+        if (event.results[i].isFinal) {
+          const transcript = event.results[i][0].transcript.trim();
+          
+          if (transcript && room) {
+            const rawName = room.localParticipant.identity || "Me";
+            const displayName = rawName.split("#")[0];
 
-      if (transcript.trim() && room) {
-        const rawName = room.localParticipant.identity || "Me";
-        const displayName = rawName.split("#")[0];
+            // 自分の画面にログ追加
+            appendTranscriptLog(displayName, transcript);
 
-        // 中央パネルに書き出し
-        appendTranscriptLog(displayName, transcript);
-
-        // 他のユーザーへ送信
-        const encoder = new TextEncoder();
-        const payload = encoder.encode(JSON.stringify({ type: "transcript", text: transcript }));
-        room.localParticipant.publishData(payload, { reliable: true });
+            // 他のユーザーへ送信
+            const encoder = new TextEncoder();
+            const payload = encoder.encode(JSON.stringify({ type: "transcript", text: transcript }));
+            room.localParticipant.publishData(payload, { reliable: true });
+          }
+        }
       }
     };
 
