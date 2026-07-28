@@ -1,137 +1,3 @@
-import { Room, RoomEvent } from "https://esm.sh/livekit-client";
-
-const LIVEKIT_URL = "wss://webrtc-wtj5ox8r.livekit.cloud";
-let currentRoom = null;
-let recognition = null; // 音声認識オブジェクト
-let isTranscribing = false;
-
-// 字幕を表示・消去するヘルパー関数
-function displayCaption(participantSid, text) {
-  const captionEl = document.getElementById(`caption-${participantSid}`);
-  if (!captionEl) return;
-  
-  captionEl.textContent = text;
-  captionEl.classList.add("active");
-
-  // 一定時間（4秒）喋らなかったら字幕を消す
-  clearTimeout(captionEl.timer);
-  captionEl.timer = setTimeout(() => {
-    captionEl.textContent = "";
-    captionEl.classList.remove("active");
-  }, 4000);
-}
-
-// 参加者が入室したときに「カードの枠」を作る関数
-function createParticipantCard(participant) {
-  if (!participant || document.getElementById(`card-${participant.sid}`)) return;
-
-  const container = document.getElementById("videos");
-  if (!container) return;
-
-  const card = document.createElement("div");
-  card.className = "participant-card";
-  card.id = `card-${participant.sid}`;
-
-  const avatar = document.createElement("div");
-  avatar.className = "avatar-placeholder";
-  
-  const rawName = participant.identity || "Unknown";
-  const displayName = rawName.split("#")[0];
-  
-  avatar.textContent = String(displayName).substring(0, 2).toUpperCase();
-  card.appendChild(avatar);
-
-  const label = document.createElement("div");
-  label.className = "name-label";
-  label.textContent = displayName;
-  card.appendChild(label);
-
-  // 【追加】字幕表示用のエリアを作成
-  const caption = document.createElement("div");
-  caption.className = "caption-box";
-  caption.id = `caption-${participant.sid}`;
-  card.appendChild(caption);
-
-  container.appendChild(card);
-}
-
-// 参加者が退室したときにカードを消去する関数
-function removeParticipantCard(participant) {
-  if (!participant) return;
-  const card = document.getElementById(`card-${participant.sid}`);
-  if (card) card.remove();
-}
-
-// 映像や音声（トラック）が届いたときにカード内に追加する関数
-function handleTrackAttach(track, participant) {
-  if (!track || !participant) return;
-  const card = document.getElementById(`card-${participant.sid}`);
-  if (!card) return;
-  if (document.getElementById(`track-${track.sid}`)) return;
-
-  const el = track.attach();
-  el.id = `track-${track.sid}`;
-  card.appendChild(el);
-}
-
-// トラックが外れたときに画面から消す関数
-function handleTrackDetach(track) {
-  if (!track) return;
-  const el = document.getElementById(`track-${track.sid}`);
-  if (el) el.remove();
-}
-
-// 【追加】リアルタイム文字起こし（Web Speech API）の初期化
-function setupSpeechRecognition(room) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    alert("お使いのブラウザはリアルタイム文字起こしに対応していません。（Chrome推奨）");
-    return;
-  }
-
-  recognition = new SpeechRecognition();
-  recognition.lang = "ja-JP";
-  recognition.continuous = true;
-  recognition.interimResults = true;
-
-  recognition.onresult = (event) => {
-    let transcript = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-
-    if (transcript.trim() && room) {
-      // 1. 自分の画面に字幕を表示
-      displayCaption(room.localParticipant.sid, transcript);
-
-      // 2. LiveKitのデータチャネルを使って他の相手全員に字幕テキストを送信
-      const encoder = new TextEncoder();
-      const payload = encoder.encode(JSON.stringify({ type: "transcript", text: transcript }));
-      room.localParticipant.publishData(payload, { reliable: true });
-    }
-  };
-
-  recognition.onerror = (e) => console.warn("音声認識エラー:", e);
-  
-  // 勝手に停止したときに自動再開
-  recognition.onend = () => {
-    if (isTranscribing) {
-      try { recognition.start(); } catch (e) {}
-    }
-  };
-}
-
-async function start() {
-  const nameInput = document.getElementById("username-input");
-  const baseName = nameInput.value.trim() || "User";
-  const uniqueIdentity = `${baseName}#${Math.floor(1000 + Math.random() * 9000)}`;
-
-  const connectBtn = document.getElementById("connect-btn");
-  if (connectBtn) {
-    connectBtn.disabled = true;
-    connectBtn.textContent = "接続中...";
-  }
-
   try {
     const token = await fetch(`/token?identity=${encodeURIComponent(uniqueIdentity)}`)
       .then(res => res.json())
@@ -146,16 +12,31 @@ async function start() {
     room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => handleTrackAttach(track, participant));
     room.on(RoomEvent.TrackUnsubscribed, (track) => handleTrackDetach(track));
 
-    // 【追加】他の参加者から字幕データが届いた時の処理
+    // 他の参加者から字幕データ（publishData）が届いた時の処理
     room.on(RoomEvent.DataReceived, (payload, participant) => {
+      if (!participant) return;
       try {
         const str = new TextDecoder().decode(payload);
         const data = JSON.parse(str);
+        
         if (data.type === "transcript") {
-          // 画面下部の字幕エリアを更新
+          // 1. 前半コードの関数を使い、話した相手のカード内に字幕を表示
+          displayCaption(participant.sid, data.text);
+
+          // 2. 画面下部に共通の字幕エリアがあればそこも更新
           const captionText = document.getElementById("caption-text");
           if (captionText) {
             captionText.textContent = data.text;
+          }
+
+          // ★【ログ記録】相手の発言をダウンロード用履歴に自動保存
+          if (data.text.trim() !== "") {
+            const rawName = participant.identity || "Unknown";
+            const displayName = rawName.split("#")[0]; // 名前の「#数字」をカット
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0]; // 時分秒 (例: 12:05:22)
+            
+            conversationLogs.push(`[${timeStr}] ${displayName}: ${data.text}`);
           }
         }
       } catch (e) {
@@ -233,7 +114,7 @@ document.getElementById("toggle-cam-btn")?.addEventListener("click", async (e) =
   });
 });
 
-// 【追加】字幕（文字起こし）のオンオフ
+// 字幕（文字起こし）のオンオフ
 document.getElementById("toggle-stt-btn")?.addEventListener("click", (e) => {
   if (!recognition) return;
 
@@ -242,6 +123,12 @@ document.getElementById("toggle-stt-btn")?.addEventListener("click", (e) => {
     isTranscribing = false;
     e.target.textContent = "字幕 ON";
     e.target.classList.remove("active");
+    
+    // 自分の字幕表示を即座にクリア
+    if (currentRoom) {
+      const myCaption = document.getElementById(`caption-${currentRoom.localParticipant.sid}`);
+      if (myCaption) myCaption.textContent = "";
+    }
   } else {
     try {
       recognition.start();
@@ -254,6 +141,33 @@ document.getElementById("toggle-stt-btn")?.addEventListener("click", (e) => {
   }
 });
 
+// ★【新機能】「ログを保存」ボタンのクリック処理
+document.getElementById("save-log-btn")?.addEventListener("click", () => {
+  if (conversationLogs.length === 0) {
+    alert("保存する文字起こしログがまだありません。字幕をONにして会話をしてください。");
+    return;
+  }
+
+  // ログの配列を改行で結合してテキストデータ化
+  const logContent = conversationLogs.join("\n");
+  const blob = new Blob([logContent], { type: "text/plain;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.href = url;
+  
+  // 日付付きのファイル名で保存できるようにする (例: meeting_log_2026-07-28.txt)
+  const today = new Date().toISOString().split('T')[0];
+  link.setAttribute("download", `meeting_log_${today}.txt`);
+  
+  document.body.appendChild(link);
+  link.click();
+  
+  // 後片付け
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+});
+
 // 退室処理
 document.getElementById("leave-btn")?.addEventListener("click", () => {
   if (recognition && isTranscribing) {
@@ -264,6 +178,10 @@ document.getElementById("leave-btn")?.addEventListener("click", () => {
     currentRoom.disconnect();
     currentRoom = null;
   }
+  
+  // ★退室時に会話ログをリセット
+  conversationLogs = []; 
+  
   document.getElementById("videos").innerHTML = "";
   document.getElementById("controls").style.display = "none";
   document.getElementById("setup-area").style.display = "flex";
