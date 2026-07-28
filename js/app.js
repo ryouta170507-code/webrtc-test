@@ -283,3 +283,62 @@ document.getElementById("save-log-btn")?.addEventListener("click", () => {
     alert("保存する文字起こしログがまだありません。字幕をONにして会話をしてください。");
     return;
   }
+// 「ログを保存」ボタンのクリック処理
+document.getElementById("save-log-btn")?.addEventListener("click", () => {
+  if (conversationLogs.length === 0) {
+    alert("保存する文字起こしログがまだありません。字幕をONにして会話をしてください。");
+    return;
+  }
+
+  // ログの配列を改行で結合してテキストデータ化
+  const logContent = conversationLogs.join("\n");
+  const blob = new Blob([logContent], { type: "text/plain;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.href = url;
+  
+  // 日付付きのファイル名で保存できるようにする（例: meeting_log_2026-07-28.txt）
+  const today = new Date().toISOString().split('T')[0];
+  link.setAttribute("download", `meeting_log_${today}.txt`);
+  
+  document.body.appendChild(link);
+  link.click();
+  
+  // 後片付け
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+});
+
+// 退室処理
+document.getElementById("leave-btn")?.addEventListener("click", () => {
+  if (recognition && isTranscribing) {
+    recognition.stop();
+    isTranscribing = false;
+  }
+  if (currentRoom) {
+    currentRoom.disconnect();
+    currentRoom = null;
+  }
+  
+  // 退室時に会話ログをリセット
+  conversationLogs = []; 
+  
+  document.getElementById("videos").innerHTML = "";
+  document.getElementById("controls").style.display = "none";
+  document.getElementById("setup-area").style.display = "flex";
+  
+  const sttBtn = document.getElementById("toggle-stt-btn");
+  if (sttBtn) {
+    sttBtn.textContent = "字幕 ON";
+    sttBtn.classList.remove("active");
+    sttBtn.disabled = false;
+    sttBtn.style.backgroundColor = ""; // スマホでの無効化表示をリセット
+  }
+
+  const connectBtn = document.getElementById("connect-btn");
+  if (connectBtn) {
+    connectBtn.disabled = false;
+    connectBtn.textContent = "通話に参加";
+  }
+});
