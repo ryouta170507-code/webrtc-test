@@ -7,24 +7,56 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <h2>LiveKit Room</h2>
-    
     <!-- 入室前の設定エリア -->
     <div class="setup-container" id="setup-area">
+        <h2>LiveKit Room</h2>
         <input type="text" id="username-input" placeholder="名前を入力してください">
         <button id="connect-btn" class="btn">通話に参加</button>
     </div>
 
-    <!-- 通話中の操作ボタンエリア -->
-    <div id="controls" style="display: none;">
-      <button id="toggle-mic-btn" class="btn control-btn">マイクをミュート</button>
-      <button id="toggle-cam-btn" class="btn control-btn">カメラをオフ</button>
-      <button id="toggle-stt-btn" class="btn control-btn">字幕 ON</button>
-      <button id="save-log-btn" class="btn control-btn" style="background-color: #2b6cb0;">ログを保存</button>
-      <button id="leave-btn" class="btn control-btn">退室する</button>
-    </div>
+    <!-- 通話画面全体コンテナ -->
+    <div id="call-container" style="display: none;">
+        
+        <!-- 1. 上部：参加者のビデオ/アバター枠（横並び） -->
+        <div id="videos" class="videos-row"></div>
 
-    <div id="videos"></div>
+        <!-- 2. 中央：文字起こし ＆ AIまとめ（左右2分割） -->
+        <div id="middle-content">
+            <!-- 左：文字起こしエリア -->
+            <div class="panel-box" id="transcript-panel">
+                <div class="panel-header">文字起こし</div>
+                <div id="transcript-list" class="panel-body"></div>
+            </div>
+
+            <!-- 右：AIまとめ（要約）エリア -->
+            <div class="panel-box" id="summary-panel">
+                <div class="panel-header">AIまとめ（要約）</div>
+                <div id="summary-content" class="panel-body">
+                    <p class="placeholder-text">「AIまとめ」ボタンを押すと、ここまでの会話の要約が表示されます。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 下部：コントロールバー -->
+        <div id="controls-bar">
+            <div class="controls-left">
+                <div id="timer">経過時間 00:00:00</div>
+            </div>
+
+            <div class="controls-center">
+                <button id="toggle-mic-btn" class="btn control-btn">マイク</button>
+                <button id="toggle-cam-btn" class="btn control-btn">カメラ</button>
+                <button id="toggle-stt-btn" class="btn control-btn">字幕 ON</button>
+                <button id="ai-summary-btn" class="btn control-btn ai-btn">AIまとめ</button>
+                <button id="save-log-btn" class="btn control-btn log-btn">ログ保存</button>
+            </div>
+
+            <div class="controls-right">
+                <button id="leave-btn" class="btn leave-btn">終了</button>
+            </div>
+        </div>
+
+    </div>
 
     <script type="module" src="js/app.js"></script>
 </body>
