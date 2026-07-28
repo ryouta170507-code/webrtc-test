@@ -52,7 +52,7 @@ h2 {
     border-radius: 8px;
     cursor: pointer;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, background-color 0.2s;
 }
 .btn:hover {
     opacity: 0.9;
@@ -74,8 +74,14 @@ h2 {
     font-size: 0.9rem;
 }
 .control-btn.active {
-    background-color: #e53e3e; /* オフの時は赤くする */
+    background-color: #e53e3e; /* ミュート・オフの時は赤くする */
 }
+
+/* 【追加】字幕ボタンがON（アクティブ）の時の色 */
+#toggle-stt-btn.active {
+    background-color: #2b6cb0; /* 字幕ONの時は青色にハイライト */
+}
+
 #leave-btn {
     background-color: #e53e3e;
 }
@@ -138,4 +144,30 @@ h2 {
     border-radius: 4px;
     font-size: 0.85rem;
     z-index: 2;
+}
+
+/* 【追加】リアルタイム字幕表示エリア */
+.caption-box {
+    position: absolute;
+    bottom: 42px; /* 名前ラベルの上に表示される位置に調整 */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    max-width: 85%;
+    text-align: center;
+    word-break: break-word;
+    z-index: 3; /* 映像や名前ラベルより手前に表示 */
+    display: none;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* 字幕があるときだけ表示 */
+.caption-box.active {
+    display: block;
 }
