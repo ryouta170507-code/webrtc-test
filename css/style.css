@@ -104,12 +104,37 @@ body {
     z-index: 2;
 }
 
-/* ★ PC表示ではスマホ用タブを完全に非表示にする */
+/* 参加者カード上の個別ミュートボタン */
+.participant-mute-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid #4b5563;
+    color: #ffffff;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    z-index: 3;
+    transition: 0.2s;
+}
+
+.participant-mute-btn.muted {
+    background-color: rgba(220, 38, 38, 0.85);
+    border-color: #ef4444;
+}
+
+/* PC表示ではスマホ用タブを完全に非表示 */
 .mobile-tab-bar {
     display: none !important;
 }
 
-/* 2. 中央：文字起こし & AIまとめ（PCは左右2分割で両方表示） */
+/* 2. 中央：文字起こし & AIまとめ */
 #middle-content {
     display: flex;
     flex: 1;
@@ -122,7 +147,7 @@ body {
     flex: 1;
     background-color: #1f2937;
     border-radius: 8px;
-    display: flex !important; /* PCでは常に両方表示 */
+    display: flex !important;
     flex-direction: column;
     border: 1px solid #374151;
     overflow: hidden;
@@ -145,7 +170,6 @@ body {
     line-height: 1.6;
 }
 
-/* 文字起こしログアイテム */
 .log-item {
     margin-bottom: 10px;
     word-break: break-all;
@@ -199,7 +223,6 @@ body {
     white-space: nowrap;
 }
 
-/* ボタン装飾 */
 .btn {
     color: white;
     border: none;
@@ -221,10 +244,7 @@ body {
 .log-btn { background-color: #2563eb; }
 .leave-btn { background-color: #dc2626; }
 
-
-/* ==========================================
-   スマホ（画面幅768px以下）用のレスポンシブCSS
-   ========================================== */
+/* スマホ用レスポンシブスタイル */
 @media (max-width: 768px) {
     .videos-row {
         height: 110px;
@@ -242,7 +262,14 @@ body {
         font-size: 0.9rem;
     }
 
-    /* スマホ画面のみタブを表示 */
+    .participant-mute-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+        top: 4px;
+        right: 4px;
+    }
+
     .mobile-tab-bar {
         display: flex !important;
         gap: 8px;
@@ -268,7 +295,6 @@ body {
         border-color: #3b82f6;
     }
 
-    /* スマホでは選択されたタブのみを表示 */
     #middle-content {
         padding: 8px;
         gap: 0;
