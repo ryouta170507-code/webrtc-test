@@ -12,37 +12,32 @@
     room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => handleTrackAttach(track, participant));
     room.on(RoomEvent.TrackUnsubscribed, (track) => handleTrackDetach(track));
 
-    // 他の参加者から字幕データ（publishData）が届いた時の処理
-    room.on(RoomEvent.DataReceived, (payload, participant) => {
-      if (!participant) return;
-      try {
-        const str = new TextDecoder().decode(payload);
-        const data = JSON.parse(str);
-        
-        if (data.type === "transcript") {
-          // 1. 前半コードの関数を使い、話した相手のカード内に字幕を表示
-          displayCaption(participant.sid, data.text);
+    recognition.onresult = (event) => {
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
 
-          // 2. 画面下部に共通の字幕エリアがあればそこも更新
-          const captionText = document.getElementById("caption-text");
-          if (captionText) {
-            captionText.textContent = data.text;
-          }
+    if (transcript.trim() && room) {
+      // 1. 自分の画面に字幕を表示
+      displayCaption(room.localParticipant.sid, transcript);
 
-          // ★【ログ記録】相手の発言をダウンロード用履歴に自動保存
-          if (data.text.trim() !== "") {
-            const rawName = participant.identity || "Unknown";
-            const displayName = rawName.split("#")[0]; // 名前の「#数字」をカット
-            const now = new Date();
-            const timeStr = now.toTimeString().split(' ')[0]; // 時分秒 (例: 12:05:22)
-            
-            conversationLogs.push(`[${timeStr}] ${displayName}: ${data.text}`);
-          }
-        }
-      } catch (e) {
-        console.error("データ受信エラー:", e);
-      }
-    });
+      // ★【ここを追加！】自分の発言をダウンロード用履歴に自動保存
+      const myRawName = room.localParticipant.identity || "Unknown";
+      const myDisplayName = myRawName.split("#")[0]; // 名前の「#数字」をカット
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0]; // 時分秒 (例: 12:05:22)
+      
+      // ログに自分の発言を追加
+      conversationLogs.push(`[${timeStr}] ${myDisplayName}: ${transcript}`);
+
+
+      // 2. LiveKitのデータチャネルを使って他の相手全員に字幕テキストを送信
+      const encoder = new TextEncoder();
+      const payload = encoder.encode(JSON.stringify({ type: "transcript", text: transcript }));
+      room.localParticipant.publishData(payload, { reliable: true });
+    }
+  };
 
     await room.connect(LIVEKIT_URL, token);
     console.log("ルームに接続しました:", room.name);
