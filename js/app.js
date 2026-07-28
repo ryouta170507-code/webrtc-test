@@ -7,8 +7,9 @@ let isTranscribing = false;
 let conversationLogs = [];
 let timerInterval = null;
 let secondsElapsed = 0;
+let currentFacingMode = "user"; // 'user' = インカメラ, 'environment' = アウトカメラ
 
-// タイマーを開始する関数
+// タイマー開始
 function startTimer() {
   secondsElapsed = 0;
   const timerEl = document.getElementById("timer");
@@ -25,14 +26,14 @@ function startTimer() {
   }, 1000);
 }
 
-// タイマーをストップする関数
+// タイマー停止
 function stopTimer() {
   if (timerInterval) clearInterval(timerInterval);
   const timerEl = document.getElementById("timer");
   if (timerEl) timerEl.textContent = "経過時間 00:00:00";
 }
 
-// 中央の「文字起こし」エリアにログを追加・自動スクロールする関数
+// 文字起こしログ追加
 function appendTranscriptLog(speaker, text) {
   const listEl = document.getElementById("transcript-list");
   if (!listEl || !text.trim()) return;
@@ -47,11 +48,10 @@ function appendTranscriptLog(speaker, text) {
   listEl.appendChild(item);
   listEl.scrollTop = listEl.scrollHeight;
 
-  // ダウンロード用データにも保存
   conversationLogs.push(`[${timeStr}] ${speaker}: ${text}`);
 }
 
-// 参加者カード作成（上部横並び用）
+// 参加者カード作成
 function createParticipantCard(participant) {
   if (!participant || document.getElementById(`card-${participant.sid}`)) return;
 
@@ -76,6 +76,34 @@ function createParticipantCard(participant) {
   label.textContent = displayName;
   card.appendChild(label);
 
+  // ★ 自分以外の参加者カードにミュートボタンを追加
+  if (!participant.isLocal) {
+    const muteBtn = document.createElement("button");
+    muteBtn.className = "participant-mute-btn";
+    muteBtn.innerHTML = "🔊";
+    muteBtn.title = "相手の声をミュート";
+
+    muteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      participant.isAudioMutedByMe = !participant.isAudioMutedByMe;
+
+      // 音声要素のミュート切替
+      participant.audioTrackPublications.forEach((pub) => {
+        if (pub.track) {
+          const el = document.getElementById(`track-${pub.track.sid}`);
+          if (el) {
+            el.muted = participant.isAudioMutedByMe;
+          }
+        }
+      });
+
+      muteBtn.innerHTML = participant.isAudioMutedByMe ? "🔇" : "🔊";
+      muteBtn.classList.toggle("muted", participant.isAudioMutedByMe);
+    });
+
+    card.appendChild(muteBtn);
+  }
+
   container.appendChild(card);
 }
 
@@ -93,6 +121,12 @@ function handleTrackAttach(track, participant) {
 
   const el = track.attach();
   el.id = `track-${track.sid}`;
+
+  // 相手の音声を自分がミュート状態に設定していれば適用
+  if (track.kind === "audio" && participant.isAudioMutedByMe) {
+    el.muted = true;
+  }
+
   card.appendChild(el);
 }
 
@@ -102,7 +136,7 @@ function handleTrackDetach(track) {
   if (el) el.remove();
 }
 
-// 音声認識セットアップ（話し終わり確定時のみログ化するよう修正）
+// 音声認識セットアップ
 function setupSpeechRecognition(room) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   
@@ -120,11 +154,10 @@ function setupSpeechRecognition(room) {
     recognition = new SpeechRecognition();
     recognition.lang = "ja-JP";
     recognition.continuous = true;
-    recognition.interimResults = true; // 認識精度向上のため有効化
+    recognition.interimResults = true;
 
     recognition.onresult = (event) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        // ★ 確定した（話し終わった）テキストのみを処理
         if (event.results[i].isFinal) {
           const transcript = event.results[i][0].transcript.trim();
           
@@ -132,10 +165,8 @@ function setupSpeechRecognition(room) {
             const rawName = room.localParticipant.identity || "Me";
             const displayName = rawName.split("#")[0];
 
-            // 自分の画面にログ追加
             appendTranscriptLog(displayName, transcript);
 
-            // 他のユーザーへ送信
             const encoder = new TextEncoder();
             const payload = encoder.encode(JSON.stringify({ type: "transcript", text: transcript }));
             room.localParticipant.publishData(payload, { reliable: true });
@@ -181,7 +212,6 @@ async function start() {
     room.on(RoomEvent.TrackSubscribed, (track, pub, p) => handleTrackAttach(track, p));
     room.on(RoomEvent.TrackUnsubscribed, (track) => handleTrackDetach(track));
 
-    // 受信データ（相手の発言）を中央パネルへ出力
     room.on(RoomEvent.DataReceived, (payload, participant) => {
       if (!participant) return;
       try {
@@ -200,17 +230,14 @@ async function start() {
 
     await room.connect(LIVEKIT_URL, token);
 
-    // 安全に表示切替
     const setupArea = document.getElementById("setup-area");
     if (setupArea) setupArea.style.display = "none";
 
     const callContainer = document.getElementById("call-container");
     if (callContainer) callContainer.style.display = "flex";
 
-    // タイマー開始
     startTimer();
 
-    // 自分のカードを作成
     createParticipantCard(room.localParticipant);
 
     room.remoteParticipants.forEach((participant) => {
@@ -221,7 +248,7 @@ async function start() {
     });
 
     try {
-      await room.localParticipant.setCameraEnabled(true);
+      await room.localParticipant.setCameraEnabled(true, { facingMode: currentFacingMode });
       room.localParticipant.videoTrackPublications.forEach((pub) => {
         if (pub.videoTrack) handleTrackAttach(pub.videoTrack, room.localParticipant);
       });
@@ -244,7 +271,7 @@ async function start() {
 
 document.getElementById("connect-btn")?.addEventListener("click", start);
 
-// マイク/カメラの切り替え
+// マイクON/OFF
 document.getElementById("toggle-mic-btn")?.addEventListener("click", async (e) => {
   if (!currentRoom) return;
   const enabled = currentRoom.localParticipant.isMicrophoneEnabled;
@@ -253,12 +280,39 @@ document.getElementById("toggle-mic-btn")?.addEventListener("click", async (e) =
   e.target.classList.toggle("active", enabled);
 });
 
+// カメラON/OFF
 document.getElementById("toggle-cam-btn")?.addEventListener("click", async (e) => {
   if (!currentRoom) return;
   const enabled = currentRoom.localParticipant.isCameraEnabled;
-  await currentRoom.localParticipant.setCameraEnabled(!enabled);
+  await currentRoom.localParticipant.setCameraEnabled(!enabled, { facingMode: currentFacingMode });
   e.target.textContent = !enabled ? "カメラ" : "カメラ(オフ)";
   e.target.classList.toggle("active", enabled);
+});
+
+// ★ インカメラ / アウトカメラ切り替えボタンの動作
+document.getElementById("switch-cam-btn")?.addEventListener("click", async () => {
+  if (!currentRoom) return;
+  if (!currentRoom.localParticipant.isCameraEnabled) {
+    alert("カメラがオフになっています。先にカメラをONにしてください。");
+    return;
+  }
+
+  // カメラ向きの反転 (user ⇔ environment)
+  currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+
+  try {
+    // カメラの再接続
+    await currentRoom.localParticipant.setCameraEnabled(false);
+    await currentRoom.localParticipant.setCameraEnabled(true, { facingMode: currentFacingMode });
+    
+    // 自身のビデオ要素をアタッチし直す
+    currentRoom.localParticipant.videoTrackPublications.forEach((pub) => {
+      if (pub.videoTrack) handleTrackAttach(pub.videoTrack, currentRoom.localParticipant);
+    });
+  } catch (e) {
+    console.error("カメラ切替エラー:", e);
+    alert("カメラの切り替えに失敗しました。端末にアウトカメラがない可能性があります。");
+  }
 });
 
 // 字幕（文字起こし）ON/OFF
@@ -282,7 +336,7 @@ document.getElementById("toggle-stt-btn")?.addEventListener("click", (e) => {
   }
 });
 
-// 「AIまとめ」ボタンを押したときの処理
+// AIまとめ
 document.getElementById("ai-summary-btn")?.addEventListener("click", () => {
   const summaryBox = document.getElementById("summary-content");
   if (!summaryBox) return;
@@ -292,7 +346,6 @@ document.getElementById("ai-summary-btn")?.addEventListener("click", () => {
     return;
   }
 
-  // スマホ表示中の場合、自動で「AIまとめ」タブに切り替える
   if (window.innerWidth <= 768 && tabSummaryBtn) {
     tabSummaryBtn.click();
   }
@@ -364,9 +417,7 @@ document.getElementById("leave-btn")?.addEventListener("click", () => {
   }
 });
 
-/* ==========================================
-   スマホ用 タブ切り替え処理
-   ========================================== */
+// スマホ用タブ切替処理
 const tabTranscriptBtn = document.getElementById("tab-transcript-btn");
 const tabSummaryBtn = document.getElementById("tab-summary-btn");
 const transcriptPanel = document.getElementById("transcript-panel");
