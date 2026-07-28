@@ -7,7 +7,6 @@ let isTranscribing = false;
 let conversationLogs = [];
 let timerInterval = null;
 let secondsElapsed = 0;
-let currentFacingMode = "user"; // 'user' = インカメラ, 'environment' = アウトカメラ
 
 // タイマー開始
 function startTimer() {
@@ -76,7 +75,7 @@ function createParticipantCard(participant) {
   label.textContent = displayName;
   card.appendChild(label);
 
-  // ★ 自分以外の参加者カードにミュートボタンを追加
+  // 自分以外の参加者カードにミュートボタンを追加
   if (!participant.isLocal) {
     const muteBtn = document.createElement("button");
     muteBtn.className = "participant-mute-btn";
@@ -87,7 +86,6 @@ function createParticipantCard(participant) {
       e.stopPropagation();
       participant.isAudioMutedByMe = !participant.isAudioMutedByMe;
 
-      // 音声要素のミュート切替
       participant.audioTrackPublications.forEach((pub) => {
         if (pub.track) {
           const el = document.getElementById(`track-${pub.track.sid}`);
@@ -117,12 +115,14 @@ function handleTrackAttach(track, participant) {
   if (!track || !participant) return;
   const card = document.getElementById(`card-${participant.sid}`);
   if (!card) return;
-  if (document.getElementById(`track-${track.sid}`)) return;
+
+  // 既存の同種トラックエレメントがあれば削除して付け直す（カメラ切替対策）
+  const oldEl = document.getElementById(`track-${track.sid}`);
+  if (oldEl) oldEl.remove();
 
   const el = track.attach();
   el.id = `track-${track.sid}`;
 
-  // 相手の音声を自分がミュート状態に設定していれば適用
   if (track.kind === "audio" && participant.isAudioMutedByMe) {
     el.muted = true;
   }
@@ -248,7 +248,7 @@ async function start() {
     });
 
     try {
-      await room.localParticipant.setCameraEnabled(true, { facingMode: currentFacingMode });
+      await room.localParticipant.setCameraEnabled(true);
       room.localParticipant.videoTrackPublications.forEach((pub) => {
         if (pub.videoTrack) handleTrackAttach(pub.videoTrack, room.localParticipant);
       });
@@ -284,34 +284,65 @@ document.getElementById("toggle-mic-btn")?.addEventListener("click", async (e) =
 document.getElementById("toggle-cam-btn")?.addEventListener("click", async (e) => {
   if (!currentRoom) return;
   const enabled = currentRoom.localParticipant.isCameraEnabled;
-  await currentRoom.localParticipant.setCameraEnabled(!enabled, { facingMode: currentFacingMode });
+  await currentRoom.localParticipant.setCameraEnabled(!enabled);
   e.target.textContent = !enabled ? "カメラ" : "カメラ(オフ)";
   e.target.classList.toggle("active", enabled);
 });
 
-// ★ インカメラ / アウトカメラ切り替えボタンの動作
+// ★ 確実な「カメラ切り替え（デバイスID検索方式）」
 document.getElementById("switch-cam-btn")?.addEventListener("click", async () => {
   if (!currentRoom) return;
-  if (!currentRoom.localParticipant.isCameraEnabled) {
+
+  const localParticipant = currentRoom.localParticipant;
+  if (!localParticipant.isCameraEnabled) {
     alert("カメラがオフになっています。先にカメラをONにしてください。");
     return;
   }
 
-  // カメラ向きの反転 (user ⇔ environment)
-  currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-
   try {
-    // カメラの再接続
-    await currentRoom.localParticipant.setCameraEnabled(false);
-    await currentRoom.localParticipant.setCameraEnabled(true, { facingMode: currentFacingMode });
-    
-    // 自身のビデオ要素をアタッチし直す
-    currentRoom.localParticipant.videoTrackPublications.forEach((pub) => {
-      if (pub.videoTrack) handleTrackAttach(pub.videoTrack, currentRoom.localParticipant);
+    // 端末のカメラ一覧を取得
+    const devices = await Room.getLocalDevices('videoinput');
+    if (!devices || devices.length <= 1) {
+      alert("切り替え可能なカメラが他に見つかりませんでした。");
+      return;
+    }
+
+    // 現在使用中のカメラIDを取得
+    let currentDeviceId = "";
+    localParticipant.videoTrackPublications.forEach((pub) => {
+      if (pub.track && pub.track.mediaStreamTrack) {
+        currentDeviceId = pub.track.mediaStreamTrack.getSettings().deviceId;
+      }
     });
+
+    // 現在と異なるカメラを選択（"back" や "environment" などの名前があれば優先）
+    let targetDevice = devices.find(d => 
+      d.deviceId !== currentDeviceId && 
+      /back|rear|environment|アウト|背面|外/i.test(d.label)
+    );
+
+    // 見つからなければ単純に現在と違う別のカメラを選択
+    if (!targetDevice) {
+      targetDevice = devices.find(d => d.deviceId !== currentDeviceId);
+    }
+
+    if (targetDevice) {
+      // LiveKit専用の切り替えメソッドを実行
+      if (typeof localParticipant.switchCamera === "function") {
+        await localParticipant.switchCamera(targetDevice.deviceId);
+      } else {
+        await localParticipant.setCameraEnabled(false);
+        await localParticipant.setCameraEnabled(true, { deviceId: targetDevice.deviceId });
+      }
+
+      // 画面上の自分枠を再描画
+      localParticipant.videoTrackPublications.forEach((pub) => {
+        if (pub.videoTrack) handleTrackAttach(pub.videoTrack, localParticipant);
+      });
+    }
   } catch (e) {
     console.error("カメラ切替エラー:", e);
-    alert("カメラの切り替えに失敗しました。端末にアウトカメラがない可能性があります。");
+    alert("カメラの切り替えに失敗しました。ブラウザのカメラ権限を確認してください。");
   }
 });
 
