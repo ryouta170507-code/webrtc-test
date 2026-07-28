@@ -9,6 +9,7 @@ body {
     background-color: #1a202c;
     color: #ffffff;
     height: 100vh;
+    height: 100dvh; /* スマホのアドレスバー対策 */
     overflow: hidden;
 }
 
@@ -17,9 +18,9 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    width: 100%;
+    width: 90%;
     max-width: 360px;
-    margin: 100px auto;
+    margin: 80px auto;
     padding: 30px;
     background-color: #2d3748;
     border-radius: 12px;
@@ -35,12 +36,14 @@ body {
     color: #fff;
 }
 
-/* 全体フレーム（100vhで画面いっぱいに表示） */
+/* 全体フレーム */
 #call-container {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh; /* スマホのアドレスバー対策 */
     width: 100vw;
+    overflow: hidden;
 }
 
 /* 1. 上部：参加者一覧（横スクロール可能） */
@@ -99,6 +102,11 @@ body {
     border-radius: 4px;
     font-size: 0.75rem;
     z-index: 2;
+}
+
+/* スマホ用タブバー (PC表示では隠す) */
+.mobile-tab-bar {
+    display: none;
 }
 
 /* 2. 中央：文字起こし & AIまとめ */
@@ -188,6 +196,7 @@ body {
     padding: 6px 12px;
     border-radius: 6px;
     border: 1px solid #374151;
+    white-space: nowrap;
 }
 
 /* ボタン装飾 */
@@ -200,6 +209,7 @@ body {
     border-radius: 6px;
     cursor: pointer;
     transition: 0.2s;
+    white-space: nowrap;
 }
 
 .btn:hover { opacity: 0.85; }
@@ -210,3 +220,107 @@ body {
 .ai-btn { background-color: #16a34a; } /* 緑色 */
 .log-btn { background-color: #2563eb; } /* 青色 */
 .leave-btn { background-color: #dc2626; } /* 赤色 */
+
+
+/* ==========================================
+   スマホ（画面幅768px以下）用のレスポンシブCSS
+   ========================================== */
+@media (max-width: 768px) {
+    /* 動画エリアをコンパクト化 */
+    .videos-row {
+        height: 110px;
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .participant-card {
+        aspect-ratio: 4 / 3;
+    }
+
+    .avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+
+    /* スマホ用タブを表示 */
+    .mobile-tab-bar {
+        display: flex;
+        gap: 8px;
+        padding: 8px 12px 0 12px;
+        background-color: #111827;
+    }
+
+    .mobile-tab-btn {
+        flex: 1;
+        padding: 8px 0;
+        background-color: #1f2937;
+        color: #9ca3af;
+        border: 1px solid #374151;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+
+    .mobile-tab-btn.active {
+        background-color: #2563eb;
+        color: #ffffff;
+        border-color: #3b82f6;
+    }
+
+    /* スマホではパネルを1つだけ表示（タブ切り替え） */
+    #middle-content {
+        padding: 8px;
+        gap: 0;
+    }
+
+    .panel-box {
+        display: none; /* 非アクティブ時は隠す */
+        width: 100%;
+        height: 100%;
+    }
+
+    .panel-box.active-tab {
+        display: flex; /* アクティブなタブのみ表示 */
+    }
+
+    /* スマホ下部コントロールバーの最適化 */
+    #controls-bar {
+        height: auto;
+        padding: 8px 10px;
+        padding-bottom: max(8px, env(safe-area-inset-bottom)); /* iPhone Safe Area */
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+
+    .controls-left {
+        order: 1;
+        flex: 1;
+    }
+
+    .controls-right {
+        order: 2;
+        flex: 0;
+    }
+
+    .controls-center {
+        order: 3;
+        flex: 1 0 100%;
+        display: flex;
+        gap: 6px;
+        overflow-x: auto; /* ボタンが多い場合は横スクロール */
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
+    }
+
+    #timer {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+}
